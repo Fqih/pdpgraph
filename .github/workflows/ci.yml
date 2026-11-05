@@ -66,6 +66,9 @@ jobs:
       - name: Start core stores (M0.2)
         run: make up
 
+      - name: Migrations apply, then re-apply as a no-op (M0.6)
+        run: make migrate && make migrate
+
       - name: Integration tests
         run: make test-int
 

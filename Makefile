@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help sync lint fmt check test cov test-int eval-smoke up down up-llm up-mock up-obs ingest
+.PHONY: help sync lint fmt check test cov migrate test-int eval-smoke up down up-llm up-mock up-obs ingest
 
 UV := uv run --frozen
 COMPOSE := docker compose --project-directory . -f deploy/compose/compose.yaml
@@ -36,6 +36,9 @@ up: .env ## Start the core stores (neo4j, opensearch, postgres, valkey) and wait
 
 down: ## Stop every profile and remove project volumes (compose down -v)
 	$(COMPOSE) --profile '*' down -v --remove-orphans
+
+migrate: .env ## Apply Postgres migrations (idempotent; needs `make up`)
+	$(UV) alembic upgrade head
 
 .env:
 	@echo "Missing .env: cp .env.example .env and set local passwords" >&2; exit 1

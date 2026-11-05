@@ -7,7 +7,7 @@ Claude Code updates this file at the end of every session. Newest entry on top o
 | Field | Value |
 |---|---|
 | Phase | 0 — Foundations |
-| Current task | M0.6 next (M0.7 blocked; awaiting go-ahead) |
+| Current task | M0.5 next (M0.7 blocked; awaiting go-ahead) |
 | Last updated | 2026-11-05 |
 | Release | none |
 
@@ -20,7 +20,7 @@ Claude Code updates this file at the end of every session. Newest entry on top o
 | M0.3 | done (PR #3) | config, logging + redaction, telemetry, ids, pii; 142 tests; `make cov` gate |
 | M0.4 | todo | fp32 CPU baseline first; int8/ONNX only as measured optimization with eval delta |
 | M0.5 | todo | |
-| M0.6 | todo | |
+| M0.6 | done (PR #6) | Alembic `0001_initial` = 04 §6 SQL verbatim; `make migrate` idempotent; upgrade/downgrade/re-upgrade tested |
 | M0.7 | blocked (billing class per 9router provider prefix pending from owner) | 9router alignment (ADR-016); tracked here only, not in 08-roadmap; does not block other tasks |
 
 Approved order: M0.1 → M0.3 → M0.7 → M0.2 → M0.6 → M0.5 → M0.4.
@@ -50,8 +50,12 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 - Global `core.hooksPath` on the dev machine points elsewhere, so `pre-commit install` refuses; it stays untouched. Run `make check` before every commit; CI runs the same hooks plus a full-history gitleaks scan.
 - 04 §2.1 grammar is implemented exactly as written (owner-approved): it also accepts `#pj` on Bab/def/obl/`pj-umum` and huruf/angka directly under a Pasal. Tighten only via a spec change.
 - PII patterns (`common/pii.py`) are [TUNE] and favour recall. Two rules: (1) unlabeled digit runs must not touch a letter or digit, so hex IDs, hashes, and UUIDs never match (a CI run had caught a trace ID redacted as NPWP); (2) labeled values (`NIK`, `KTP`, `No. KTP`, `nomor induk kependudukan`, `NPWP`, any case, optional space/colon/dash/dot) match even when glued to letters. **Known limitations (for README):** an unlabeled NIK/NPWP glued to letters (e.g. `abc3171…`) is missed; NIK written with internal spaces is missed unless it also passes the card Luhn check; no structural NIK validation; only mobile numbers (no landlines); no detection of names, addresses, KK/passport numbers, or other free-text PII. Any standalone 15-digit run or Luhn-valid 13–19 digit run escalates (false positives cost latency only). Measure the escalation rate on the golden set (ADR-015).
+- Migrations are hand-written SQL copied verbatim from 04 §6 (no ORM metadata, so `alembic check` / autogenerate do not apply). A schema change in 04 means a new revision with the same SQL. The integration test compares columns, types, nullability, defaults, PKs, the FK, `numeric(12,6)`, and index definitions against 04 §6.
+- mypy uses the `pydantic.mypy` plugin so settings fields filled from the environment type-check.
 - `.env` entries that are not fields of a settings class are ignored (one `.env` serves all services); YAML keys stay strict.
-- OpenSearch built-in `indonesian` analyzer stems aggressively (observed: `pengendali`→`endali`, `pribadi`→`pribad`, `memberitahukan`→`itahu`). Compare with a custom analyzer using a non-derivational Indonesian stemmer in M1.6 before fixing the mapping (eval delta required).
+- OpenSearch built-in `indonesian` analyzer stems aggressively (observed: `pengendali`→`endali`, `pribadi`→`pribad`, `memberitahukan`→`itahu`).
+- **M1.6 plan (owner):** multi-field index: `text` = standard tokenizer + lowercase, no stemming; `text.stem` = `indonesian`; optional `text.shingle` for phrases. Query all with boosts tuned on the dev split only. Protect legal terms from the stemmer with a `keyword_marker` filter whose term list is generated from the graph's Definition nodes plus actor names (pengendali, prosesor, subjek data, ...). Measure each choice as a retrieval-recall ablation: no-stem vs stem vs multi-field vs multi-field + protected terms.
+- **M2.11 plan (owner), extend `common/pii.py`:** structural NIK validation (province/regency code shape; birth date with the +40 day offset for women), which then makes it safe to detect space- and dash-separated NIK formats; labeled KK (Kartu Keluarga) and passport numbers; tests for each new pattern plus the existing hex/UUID property test. Names and addresses stay out of scope for deterministic detection (documented known limitation).
 - `vm.max_map_count` is 1048576 on the dev host (Fedora default), above OpenSearch's 262144, so no sysctl change was needed.
 - Merges use the GitHub squash-merge button (owner decision); the recorded author/committer name is accepted as is. PR #3 was squash-merged locally (`8f03aa0`) and shows as closed.
 - Commit `9df2b74` on `main` has author name `FaqihHakim` (GitHub squash merge used the profile display name). Accepted as is by the owner; no history rewrite. Later PRs are squashed to one commit locally and merged with `--rebase`, which keeps the author `Fqih` and still lands one commit per PR.
@@ -82,6 +86,10 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 | 2026-11-05 | M0.7 probe hard caps: abort at 200 calls or 200,000 total tokens, whichever first | M0.7 |
 
 ## Session log
+
+### 2026-11-05 — M0.6 migrations
+- `common/db.py` (`PostgresSettings`, same `POSTGRES_*` vars as compose), `alembic.ini`, `migrations/` (`env.py`, `0001_initial`), `make migrate`; CI integration job runs `make migrate` twice.
+- Tests first: `test_db.py` (3) and `tests/integration/test_migrations.py` (3, throwaway database per test).
 
 ### 2026-11-05 — M0.2 core stores
 - `deploy/compose/compose.yaml` (`core` profile), `make up` / `make down`, `.env.example` store passwords, `tests/integration/test_core_stores.py` (14 tests, written first).
