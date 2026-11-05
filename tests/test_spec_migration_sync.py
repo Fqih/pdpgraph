@@ -19,7 +19,7 @@ def _spec_sql() -> str:
     section = text.split("## 6. Postgres schema", 1)[1].split("\n## ", 1)[0]
     blocks = re.findall(r"```sql\n(.*?)```", section, flags=re.DOTALL)
     assert len(blocks) == 1, "04 §6 must contain exactly one ```sql block"
-    return blocks[0]
+    return str(blocks[0])
 
 
 def _migration_sql() -> str:
