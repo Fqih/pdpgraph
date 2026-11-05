@@ -8,6 +8,7 @@ from common.llm.errors import (
     CassetteWriteRefusedError,
     LLMError,
     LLMHTTPError,
+    LocalOnlyDataClassError,
     OutputValidationError,
     UsageLimitExceededError,
 )
@@ -24,6 +25,7 @@ __all__ = [
     "LLMError",
     "LLMHTTPError",
     "LLMSettings",
+    "LocalOnlyDataClassError",
     "OutputValidationError",
     "Usage",
     "UsageLimitExceededError",
