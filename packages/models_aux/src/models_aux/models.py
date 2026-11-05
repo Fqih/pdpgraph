@@ -34,7 +34,9 @@ def _load(model_cls: Any, spec: ModelSpec, settings: ModelsAuxSettings) -> tuple
     kw = {"revision": spec.revision, "cache_dir": settings.cache_dir, "local_files_only": True}
     try:
         tokenizer = AutoTokenizer.from_pretrained(spec.repo, **kw)
-        model = model_cls.from_pretrained(spec.repo, dtype=torch.float32, **kw).eval()
+        model = model_cls.from_pretrained(
+            spec.repo, dtype=torch.float32, use_safetensors=True, **kw
+        ).eval()  # never unpickle weights (SEC-13)
     except OSError:
         raise SystemExit(
             f"{spec.repo}@{spec.revision[:12]} is not in the model cache; "

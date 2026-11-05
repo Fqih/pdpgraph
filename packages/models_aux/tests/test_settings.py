@@ -21,6 +21,12 @@ def test_config_pins_three_models_by_commit_hash() -> None:
         assert spec.allow_patterns
 
 
+def test_only_safetensors_weights_are_fetched() -> None:
+    for spec in ModelsAuxSettings().models.values():
+        assert "model.safetensors" in spec.allow_patterns
+        assert not [p for p in spec.allow_patterns if p.endswith((".bin", ".pt", ".pth", ".pkl"))]
+
+
 @pytest.mark.parametrize("revision", ["main", "v1.0", "5617a9f", "Z" * 40])
 def test_revision_must_be_a_commit_hash(revision: str) -> None:
     with pytest.raises(ValidationError, match="revision"):

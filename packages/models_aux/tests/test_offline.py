@@ -49,3 +49,19 @@ def test_download_is_pinned_and_filtered(monkeypatch: pytest.MonkeyPatch, tmp_pa
         assert call["revision"] == spec.revision
         assert call["allow_patterns"] == spec.allow_patterns
         assert call["cache_dir"] == tmp_path
+
+
+def test_model_weights_load_from_safetensors_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[dict[str, Any]] = []
+
+    def fake_model(repo: str, **kw: Any) -> None:
+        seen.append(kw)
+        raise OSError("stop")
+
+    monkeypatch.setattr(models.AutoTokenizer, "from_pretrained", lambda *a, **kw: object())
+    monkeypatch.setattr(models.AutoModel, "from_pretrained", fake_model)
+    with pytest.raises(SystemExit):
+        models.load_models(ModelsAuxSettings())
+    (call,) = seen
+    assert call["use_safetensors"] is True
+    assert call["local_files_only"] is True
