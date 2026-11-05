@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Shared fixtures for common/ tests."""
+"""Repo-wide test fixtures."""
 
 import socket
 
