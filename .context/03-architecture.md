@@ -287,7 +287,7 @@ Docker Compose, profiles:
 
 Hardware profiles (documented in 07-NFR §6): `cpu-local` (reference), `ci`, `cloud-notebook` (optional, public data only).
 
-Memory budget for a 16 GB machine [TUNE]: OpenSearch heap 1 GB, Neo4j heap 1 GB + page cache 512 MB, Postgres 512 MB, Valkey 256 MB, models-aux ~2–3 GB, llama.cpp T1 ~2–4 GB (model-dependent). Set `mem_limit` per service in Compose.
+Memory budget for a 16 GB machine (BR-16 target) [TUNE]: OpenSearch heap 1 GB, Neo4j heap 1 GB + page cache 512 MB, Postgres 512 MB, Valkey 256 MB, models-aux **4.67 GiB measured RSS** (M0.4, fp32, all three models: ≈2.3 GiB anonymous + ≈2.4 GiB memory-mapped weight files; `docker stats` shows only ≈2.3 GiB because it excludes file-backed pages, so read RSS from `/proc/<pid>/status`), llama.cpp T1 ~2–4 GB (model-dependent). Set `mem_limit` per service in Compose.
 
 ### 7.1 Compute strategy without a GPU (ADR-013)
 
