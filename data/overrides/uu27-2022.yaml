@@ -1,0 +1,191 @@
+# Manual text corrections for UU 27/2022 (03 §5.1, M1.2), applied after `segment`.
+# The Komdigi page (primary text) carries transcription errors; each fix follows the salinan PDF
+# (registry `reference`, sha256 ed952dea...). `pdf_page` is the 1-based PDF page with the correct
+# wording. `confirmed_by` stays null until the owner checks that page image; unconfirmed entries
+# are applied and listed in data/review/uu27-2022/crosscheck.md.
+- unit_id: uu27-2022/p1/n4
+  find: orang, hadan publik
+  replace: orang, badan publik
+  reason: OCR-style typo 'hadan'
+  pdf_page: 2
+  confirmed_by: null
+- unit_id: uu27-2022/p15/a1
+  find: . Hak-hak
+  replace: Hak-hak
+  reason: stray leading period
+  pdf_page: 7
+  confirmed_by: null
+- unit_id: uu27-2022/p16/a2/hd
+  find: dipertanggungj awabkan
+  replace: dipertanggungjawabkan
+  reason: word split by a stray space
+  pdf_page: 8
+  confirmed_by: null
+- unit_id: uu27-2022/p17/a1/hb
+  find: hares menampilkan
+  replace: harus menampilkan
+  reason: OCR-style typo 'hares'
+  pdf_page: 9
+  confirmed_by: null
+- unit_id: uu27-2022/p20/a2/hc
+  find: kewajiban hukum dan Pengendali
+  replace: kewajiban hukum dari Pengendali
+  reason: '''dan'' for ''dari'' (changes meaning)'
+  pdf_page: 11
+  confirmed_by: null
+- unit_id: uu27-2022/p26/a2
+  find: ketentuan perundang-undangan
+  replace: ketentuan peraturan perundang-undangan
+  reason: word 'peraturan' missing
+  pdf_page: 13
+  confirmed_by: null
+- unit_id: uu27-2022/p32/a1
+  find: seFuai
+  replace: sesuai
+  reason: OCR-style typo 'seFuai'
+  pdf_page: 14
+  confirmed_by: null
+- unit_id: uu27-2022/p35/hb
+  find: yang hams dilindungi
+  replace: yang harus dilindungi
+  reason: OCR-style typo 'hams'
+  pdf_page: 16
+  confirmed_by: null
+- unit_id: uu27-2022/p46/a3
+  find: me ngenai
+  replace: mengenai
+  reason: word split by a stray space
+  pdf_page: 19
+  confirmed_by: null
+- unit_id: uu27-2022/p47
+  find: pertanggung jawaban
+  replace: pertanggungjawaban
+  reason: word split by a stray space
+  pdf_page: 19
+  confirmed_by: null
+- unit_id: uu27-2022/p51/a5
+  find: persetujuan tertulis dan Pengendali
+  replace: persetujuan tertulis dari Pengendali
+  reason: '''dan'' for ''dari'' (changes meaning)'
+  pdf_page: 21
+  confirmed_by: null
+- unit_id: uu27-2022/p61
+  find: PaSal 60
+  replace: Pasal 60
+  reason: capitalisation typo 'PaSal'
+  pdf_page: 28
+  confirmed_by: null
+- unit_id: uu27-2022/p63/a2
+  find: Edvokasi, so sialisasi
+  replace: advokasi, sosialisasi
+  reason: OCR-style typos 'Edvokasi', 'so sialisasi'
+  pdf_page: 28
+  confirmed_by: null
+- unit_id: uu27-2022/p66
+  find: menguntungkan din sendiri
+  replace: menguntungkan diri sendiri
+  reason: OCR-style typo 'din'
+  pdf_page: 30
+  confirmed_by: null
+- unit_id: uu27-2022/p67/a1
+  find: menguntungkan din sendiri
+  replace: menguntungkan diri sendiri
+  reason: OCR-style typo 'din'
+  pdf_page: 30
+  confirmed_by: null
+- unit_id: uu27-2022/p68
+  find: menguntungkan din sendiri
+  replace: menguntungkan diri sendiri
+  reason: OCR-style typo 'din'
+  pdf_page: 30
+  confirmed_by: null
+- unit_id: uu27-2022/pj-umum
+  find: meman faatkan
+  replace: memanfaatkan
+  reason: word split by a stray space
+  pdf_page: 36
+  confirmed_by: null
+- unit_id: uu27-2022/pj-umum
+  find: dikumpullcan
+  replace: dikumpulkan
+  reason: OCR-style typo 'dikumpullcan'
+  pdf_page: 36
+  confirmed_by: null
+- unit_id: uu27-2022/pj-umum
+  find: perlindungan din pribadi
+  replace: perlindungan diri pribadi
+  reason: OCR-style typo 'din'
+  pdf_page: 36
+  confirmed_by: null
+- unit_id: uu27-2022/pj-umum
+  find: umum, balk yang
+  replace: umum, baik yang
+  reason: OCR-style typo 'balk'
+  pdf_page: 36
+  confirmed_by: null
+- unit_id: uu27-2022/pj-umum
+  find: pelindungan din pribadi
+  replace: pelindungan diri pribadi
+  reason: OCR-style typo 'din'
+  pdf_page: 36
+  confirmed_by: null
+- unit_id: uu27-2022/p3/hd#pj
+  find: Pribadi hams bermanfaat
+  replace: Pribadi harus bermanfaat
+  reason: OCR-style typo 'hams'
+  pdf_page: 37
+  confirmed_by: null
+- unit_id: uu27-2022/p3/he#pj
+  find: Pribadi hams memperhatikan
+  replace: Pribadi harus memperhatikan
+  reason: OCR-style typo 'hams'
+  pdf_page: 37
+  confirmed_by: null
+- unit_id: uu27-2022/p4/a2/hb#pj
+  find: yang hams dijaga
+  replace: yang harus dijaga
+  reason: OCR-style typo 'hams'
+  pdf_page: 38
+  confirmed_by: null
+- unit_id: uu27-2022/p4/a2/hb#pj
+  find: namun tidal( terbatas
+  replace: namun tidak terbatas
+  reason: OCR-style typo 'tidal('
+  pdf_page: 38
+  confirmed_by: null
+- unit_id: uu27-2022/p33/ha#pj
+  find: keamanan din sendiri
+  replace: keamanan diri sendiri
+  reason: OCR-style typo 'din'
+  pdf_page: 45
+  confirmed_by: null
+- unit_id: uu27-2022/p34/a1#pj
+  find: yang hams dilakukan
+  replace: yang harus dilakukan
+  reason: OCR-style typo 'hams'
+  pdf_page: 45
+  confirmed_by: null
+- unit_id: uu27-2022/p57/a3#pj
+  find: adalah anis masuk
+  replace: adalah arus masuk
+  reason: OCR-style typo 'anis'
+  pdf_page: 48
+  confirmed_by: null
+- unit_id: uu27-2022/p67/a1
+  find: dimaksud dalam. Pasal 65
+  replace: dimaksud dalam Pasal 65
+  reason: stray period
+  pdf_page: 30
+  confirmed_by: null
+- unit_id: uu27-2022/pj-umum
+  find: pelayanan dan Korporasi
+  replace: pelayanan dari Korporasi
+  reason: '''dan'' for ''dari'' (changes meaning)'
+  pdf_page: 36
+  confirmed_by: null
+- unit_id: uu27-2022/p4/a2/hc#pj
+  find: jenis apapun
+  replace: jenis apa pun
+  reason: spelling differs from the salinan ('apa pun')
+  pdf_page: 38
+  confirmed_by: null

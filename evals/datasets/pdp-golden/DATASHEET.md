@@ -57,8 +57,9 @@ answer content (06-eval-plan §2.1, §3).
   - See GUIDELINE §6.
 - **Temporal items** on the Constitutional Court reading of Pasal 53 need ADR-017 ingestion
   (M4.4) before they can be evaluated.
-- **Unit ids** shown by the CLI are inferred from the source page's list nesting until
-  segmentation (M1.3) provides the authoritative units.
+- **Unit ids** shown by the CLI come from the segmentation stage (M1.2) with the manual
+  overrides applied. The text corrections in `data/overrides/uu27-2022.yaml` await the owner's
+  check against the PDF page images.
 
 ## License
 

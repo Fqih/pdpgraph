@@ -6,6 +6,7 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "httpx>=0.28.1,<0.29",
     "pdpgraph-common",
+    "pypdf>=5",
     "pyyaml>=6.0.3,<7",
 ]
 
