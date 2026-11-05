@@ -120,12 +120,9 @@ class LLMClient:
         attempt: int = 1,
     ) -> Completion:
         data_class = DataClass(data_class)
-        # Fail closed before anything is built. Replay sends nothing, so it is exempt.
-        if (
-            self._settings.mode != "replay"
-            and data_class in LOCAL_ONLY
-            and not self._settings.is_local_endpoint()
-        ):
+        # Fail closed before anything is built, identically in every mode (replay included),
+        # so a misconfigured call path fails in tests rather than first in live.
+        if data_class in LOCAL_ONLY and not self._settings.is_local_endpoint():
             raise LocalOnlyDataClassError(
                 f"data_class={data_class} may only be sent to a local endpoint (ADR-013/015)"
             )

@@ -380,7 +380,7 @@ def test_local_endpoints_default_to_loopback(tmp_path: Path) -> None:
     assert set(_settings(tmp_path).local_base_urls) == {"127.0.0.1", "::1", "localhost"}
 
 
-@pytest.mark.parametrize("mode", ["live", "record"])
+@pytest.mark.parametrize("mode", ["live", "record", "replay"])
 @pytest.mark.parametrize("data_class", LOCAL_ONLY)
 async def test_external_endpoint_refuses_local_only_classes(
     tmp_path: Path,
@@ -446,3 +446,25 @@ async def test_public_and_internal_unaffected(
     async with LLMClient(_settings(tmp_path)) as client:
         await client.complete(MESSAGES, data_class=data_class)
     assert route.call_count == 1
+
+
+@pytest.mark.parametrize("data_class", LOCAL_ONLY)
+async def test_replay_without_base_url_refuses_local_only(
+    tmp_path: Path, data_class: DataClass
+) -> None:
+    async with LLMClient(_settings(tmp_path, mode="replay", base_url=None)) as client:
+        with pytest.raises(LocalOnlyDataClassError):
+            await client.complete(MESSAGES, data_class=data_class)
+
+
+async def test_replay_with_loopback_base_url_allows_confidential(
+    tmp_path: Path, mock: respx.MockRouter
+) -> None:
+    local = "http://127.0.0.1:8080/v1"
+    mock.post(f"{local}/chat/completions").mock(return_value=_reply("ok"))
+    async with LLMClient(_settings(tmp_path, mode="record", base_url=local)) as client:
+        await client.complete(MESSAGES, data_class=DataClass.CONFIDENTIAL)
+    mock.stop()
+    async with LLMClient(_settings(tmp_path, mode="replay", base_url=local)) as client:
+        result = await client.complete(MESSAGES, data_class=DataClass.CONFIDENTIAL)
+    assert result.cassette == "hit"
