@@ -1,0 +1,36 @@
+# Python / tooling
+.venv/
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+dist/
+build/
+
+# Secrets (SEC-11): only .env.example is committed
+.env
+.env.*
+!.env.example
+
+# Data and caches (09 §6): reproducible, not committed
+data/raw/
+data/processed/
+evals/cache/
+
+# Local scratch and personal notes
+scratch/
+KICKOFF_PROMPT.md
+
+# Editors
+*.swp
+*.swo
+*.kate-swp
+.idea/
+.vscode/
+
+# UI
+node_modules/
