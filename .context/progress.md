@@ -70,6 +70,8 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 - **M0.4 latency:** `/rerank` 1×30 ≈ 7 s p50 and `/embed` 32 passages ≈ 5.8 s p50 on CPU; per-sub-question rerank cost dominates the online path (M1 planning). Ingest-time embedding of the corpus is a one-off batch.
 - **M0.4 / SEC-13:** bge-m3 re-pinned (PR #13) from `5617a9f6` (pickle `pytorch_model.bin` only) to `7b44caba`, the last official BAAI commit on `main` that ships `model.safetensors` (a later commit deleted it, no reason given). Verified: 391 fp32 tensors bit-identical to the `.bin`, file SHA-256 `993b2248…e38e7e` equals the LFS oid, and config/tokenizer files are identical. All three models now load with `use_safetensors=True`; no conversion step was needed.
 - **M0.4:** real-weights tests (`make test-models`, marker `models`) are not run in CI: they need the 4.9 GB weights. CI runs the 30 fake-model unit tests. Load times are with a warm page cache; a cold read is slower (not measured; would need dropping caches).
+- **M4.4 (ADR-017):** implement `PUTUSAN_MK` ingestion, `MODIFIES_READING` expansion, `as_of` tests, minimal ruling-path grammar + ID round-trip tests, and the citable node for the operative quote. First case: Putusan MK 151/PUU-XXII/2024 → `uu27-2022/p53/a1/hb`, effective 2025-07-30 [owner confirms operative part from the official MK PDF before ingestion]. Add a golden-set temporal item for it.
+- **M1.7:** second annotator still open (owner's answer had a placeholder). If none: v0 ships without κ, the datasheet says so, and GUIDELINE.md adds the test-retest protocol (20 random items re-labeled blind ≥ 7 days later; verdict agreement + Jaccard on gold units, reported as intra-annotator); the CLI gets a blind re-label mode.
 - **M1.16:** reservation-based `UsageLimiter` for concurrent runs: reserve estimated prompt tokens + `max_tokens` before each call, reconcile with actual usage after.
 - Cassette entries get `sanitized: true` when redaction changed any content.
 - **M0.7:** `complete_json` sends `strict: true` only when the model's catalog capability flag says it is supported; no silent fallback.
@@ -96,12 +98,15 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 | 2026-11-05 | Public repo Fqih/pdpgraph; one branch + PR per task, squash-merge after green CI | 09 §4 |
 | 2026-11-05 | M0.4 models approved (bge-m3, bge-reranker-v2-m3, mDeBERTa NLI); fp32 baseline first | 08 M0.4 |
 | 2026-11-05 | Shared deterministic PII patterns in `common/pii.py` (LLMClient cassette guard + Tierline scanner) | FR-GW-17, M0.5 |
-| 2026-11-05 | Within-tier alternates deferred to ADR-017 in M2.2 | FR-GW-02, FR-GW-09 |
+| 2026-11-05 | Within-tier alternates deferred to ADR-018 in M2.2 (renumbered; ADR-017 = MK rulings) | FR-GW-02, FR-GW-09 |
 | 2026-11-05 | Code Apache-2.0 (SPDX header per file); own datasets CC BY 4.0; statute text cited to official source | 09 §2, README |
 | 2026-11-05 | Merge with the GitHub squash button; no local squash or force-push workflows | 09 §4 |
 | 2026-11-05 | Labeled PII patterns added so `NIK3171…`-style glued values are caught | FR-GW-17 |
 | 2026-11-05 | M0.7 probe hard caps: abort at 200 calls or 200,000 total tokens, whichever first | M0.7 |
 | 2026-11-05 | models-aux: fp32, transformers only (no sentence-transformers), torch from the CPU index; weights in `~/.cache/pdpgraph/models` via `make models-download`; runtime `HF_HUB_OFFLINE=1` enforced at start + `local_files_only`; rerank score = sigmoid(logit); bge-m3 dense = CLS, L2-normalized; max_length 512 | M0.4 |
+| 2026-11-05 | M1.1 primary text source: JDIH Komdigi HTML (registry verifies law-body SHA-256 `aed0c358…`; raw snapshot SHA-256 also pinned); authoritative cross-check reference: salinan PDF `ed952dea…` (identical on BPK, peraturan.go.id, Komdigi, Kemenkeu); raw files in git-ignored `data/raw/`; owner checks the M1.2 manual-review list and 10 snapshot units against PDF page images | M1.1, M1.2, SEC-14 |
+| 2026-11-05 | MK rulings: `PUTUSAN_MK` source + `MODIFIES_READING` edge; no new text version | ADR-017, 04 §3.5 |
+| 2026-11-05 | Golden schema gains optional `proposed_by ∈ {claude, faqih, synthetic}`; `schema_version` stays 1 (unpublished); lands with the M1.7 schema model and 06 §2.1 update | M1.7 |
 | 2026-11-05 | `LLMClient` fails closed: `confidential`/`pii` only to hosts in `local_base_urls`, in every mode incl. replay; never relax | ADR-013, ADR-015 |
 | 2026-11-05 | `LLMClient` is async (httpx), `LLM_*` settings, mode defaults to `replay`; cassette key = SHA-256 of canonical request incl. attempt; secrets checked before PII; `make eval-record` stub until M1.16 | M0.5, NFR-06, NFR-12 |
 

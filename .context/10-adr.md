@@ -112,3 +112,14 @@ Format: Context → Decision → Consequences → Alternatives rejected. Status:
 - External tiers for `internal` require a per-tenant opt-in; the demo tenant opts in, so public-regulation Q&A still benefits from T2/T3.
 **Consequences:** Stricter by default; a false-positive PII hit makes a query slower (CPU T1), which is measured (escalation rate on the golden set). Scanner false negatives are a known limitation, documented in the README.
 **Rejected:** Keeping `public` (unsafe); LLM-based PII detection in the hot path (slow, non-deterministic).
+
+## ADR-017 — Constitutional Court rulings modify the reading, not the text
+**Status:** Accepted · 2026-11-05 (ADR-016 is reserved for the 9router upstream, M0.7; within-tier fallback alternates move to ADR-018)
+**Context:** Putusan MK 151/PUU-XXII/2024 (delivered 2025-07-30) held the word "dan" in UU 27/2022 Pasal 53 ayat (1) huruf b conditionally unconstitutional unless read as "dan/atau". The promulgated text is unchanged; only its binding reading changed. The schema had no way to represent this: `OTHER` loses the semantics and a new text version would misstate the statute.
+**Decision:**
+- `Source.instrument_type` gains `PUTUSAN_MK`; each ruling is its own source.
+- New relationship `(:Source {instrument_type: PUTUSAN_MK})-[:MODIFIES_READING {effective_on, holding_summary, operative_text_quote, status}]->(:LegalUnit)`; `operative_text_quote` is verbatim and citable; `status ∈ {CONDITIONALLY_UNCONSTITUTIONAL, UNCONSTITUTIONAL, OTHER}`.
+- `as_of ≥ effective_on`: expansion returns the ruling with the unit and the answer cites both; before that date the ruling is not returned.
+- Ruling citations use node IDs under the ruling's `source_id`; the grammar extension is minimal and lands with tests in M4.4.
+**Consequences:** Temporal answers stay faithful to both the statute text and the binding reading. Implementation (ingestion, expansion, `as_of` tests) is M4.4. Holding details are taken from the official MK PDF and confirmed by the owner before ingestion. A golden-set temporal item will cover it.
+**Rejected:** `instrument_type: OTHER` (loses semantics); a new text version of Pasal 53(1)(b) via `SUPERSEDES` (the text did not change).

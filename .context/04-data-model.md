@@ -17,7 +17,7 @@ Every ingested document has a `Source` record (Postgres `sources` + Neo4j `:Sour
 |---|---|---|
 | `source_id` | str (slug) | `uu27-2022` |
 | `title` | str | `Undang-Undang Nomor 27 Tahun 2022 tentang Pelindungan Data Pribadi` |
-| `instrument_type` | enum `UU, PP, PERPRES, PERMEN, PERBAN, OTHER` | `UU` |
+| `instrument_type` | enum `UU, PP, PERPRES, PERMEN, PERBAN, PUTUSAN_MK, OTHER` | `UU` |
 | `number` / `year` | int / int | `27` / `2022` |
 | `enacted_on` | date | [VERIFY] |
 | `promulgated_on` | date | [VERIFY] |
@@ -108,6 +108,7 @@ Rules:
 | `DEFINES` | `LegalUnit` → `Definition` | |
 | `USES_TERM` | `LegalUnit` → `Definition` | `count` |
 | `SUPERSEDES` | newer `LegalUnit` → older `LegalUnit` | `effective_on`, `by_source_id` |
+| `MODIFIES_READING` | `Source{instrument_type: PUTUSAN_MK}` → `LegalUnit` | `effective_on`, `holding_summary`, `operative_text_quote` (verbatim, citable quote from the ruling), `status ∈ {CONDITIONALLY_UNCONSTITUTIONAL, UNCONSTITUTIONAL, OTHER}` (§3.5, ADR-017) |
 | `IMPOSES` | `LegalUnit` → `Obligation` | |
 | `APPLIES_TO_ACTOR` | `Obligation` → `Actor` | |
 | `TRIGGERED_BY` | `Obligation` → `DataCategory` / `Concept` | `condition_text` |
@@ -133,6 +134,15 @@ CREATE INDEX legal_unit_validity IF NOT EXISTS FOR (n:LegalUnit) ON (n.valid_fro
 - `context_of(node_id)` — parent Pasal + sibling ayat + Penjelasan.
 - `version_at(unit_id, as_of)` — the single valid version (assert exactly one).
 - `candidate_obligations(actor_role, data_categories[], concepts[], as_of)` — gap-analysis seed.
+
+### 3.5 Constitutional Court rulings (ADR-017)
+
+A Mahkamah Konstitusi ruling changes the binding reading of a unit, not its promulgated text. It is ingested as its own `Source` (`instrument_type: PUTUSAN_MK`, e.g. `putusan-mk-151-2024`) linked to each affected unit by `MODIFIES_READING`. The affected `LegalUnit` keeps its text and version: no `SUPERSEDES` edge and no new version are created.
+
+- `as_of ≥ effective_on`: graph expansion (`expand_references`, `context_of`) returns the ruling alongside the unit, and generation must cite both the article text and the ruling's `operative_text_quote`.
+- `as_of < effective_on`: the ruling is not returned.
+- Citations to a ruling use a `node_id` under the ruling's own `source_id` (`putusan-mk-151-2024/…`). The minimal §2 grammar extension for ruling paths, the node representation of the operative quote for citation verification, and the ID round-trip tests are specified and implemented in M4.4.
+- Holding details come from the official MK PDF only; the owner confirms the operative part before ingestion.
 
 ## 4. Search index (OpenSearch)
 
