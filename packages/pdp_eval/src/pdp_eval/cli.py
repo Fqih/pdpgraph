@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """Labeling CLI for `pdp-golden` (M1.7): `uv run python -m pdp_eval <command>`.
 
-Commands: `validate`, `show`, `label`, `relabel` (blind test-retest), `agreement`.
+Commands: `validate`, `show`, `label`, `relabel` (blind test-retest), `agreement`, and the
+reference-sample commands `refs-sample`, `refs-label`, `refs-report` (`refs_cli.py`).
 Gold fields are only ever written from what the annotator types; nothing is pre-filled.
 At any prompt: `:show 46` prints Pasal 46 and its Penjelasan, `:umum` the Penjelasan Umum,
 `:quit` stops (labels already saved stay saved).
@@ -18,6 +19,7 @@ from typing import Any, TextIO
 
 from pdp_eval.golden import VERDICTS, GoldenItem, composition, dump_items, load_items
 from pdp_eval.law import LawText
+from pdp_eval.refs_cli import add_parsers as add_refs_parsers
 from pdp_eval.retest import LogEntry, agreement, append_log, eligible, log_path, read_log, sample
 
 Ask = Callable[[str], str]
@@ -264,6 +266,7 @@ def _parser() -> argparse.ArgumentParser:
     show = sub.add_parser("show")
     show.add_argument("pasal", help="Pasal number or 'umum'")
     show.set_defaults(fn=cmd_show)
+    add_refs_parsers(sub)
     return p
 
 

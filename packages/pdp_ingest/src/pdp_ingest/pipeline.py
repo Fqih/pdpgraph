@@ -1,19 +1,22 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Text stages after `fetch` (03 §5.1, M1.2): extract -> segment -> overrides -> crosscheck.
+"""Text stages after `fetch` (03 §5.1, M1.2-M1.3): extract -> segment -> overrides -> refs,
+plus the PDF cross-check.
 
 Artifacts under `data/processed/<source_id>/`:
 
 - `extract.jsonl`: the canonical body blocks in order (`i`, `path`, `list_item_start`, `text`);
 - `segment.jsonl`: structures and units as segmented, before overrides;
 - `units.jsonl`: the units with `data/overrides/<source_id>.yaml` applied (input of later stages);
+- `refs.jsonl`: reference and delegation mentions with resolved targets (`refs.py`);
 - `crosscheck.jsonl`: one finding per unit against the reference PDF.
 
-The owner's review list (`review.py`) goes to `data/review/<source_id>/crosscheck.md`.
+The owner's review lists go to `data/review/<source_id>/`: `crosscheck.md` (`review.py`) and
+`refs.md` (`refs_review.py`).
 """
 
 import json
 from collections.abc import Iterable
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +24,7 @@ from pdp_ingest.canonical import Block, blocks
 from pdp_ingest.crosscheck import Finding, crosscheck, pdf_pages
 from pdp_ingest.fetch import element_inner_html, load_verified
 from pdp_ingest.overrides import Override, apply_overrides, load_overrides
+from pdp_ingest.refs import Mention, extract_refs
 from pdp_ingest.registry import SourceEntry
 from pdp_ingest.segment import Segmented, Unit, segment
 
@@ -33,6 +37,7 @@ class TextResult:
     units: list[Unit]  # overrides applied
     findings: list[Finding]
     split_page: int  # first PDF page of the Penjelasan
+    mentions: list[Mention] = field(default_factory=list)
 
 
 def _write_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
@@ -70,7 +75,8 @@ def run_text_stages(
     )
     _, pdf_path = load_verified(entry, raw_dir)
     ref, findings = crosscheck(units, pdf_pages(pdf_path))
-    result = TextResult(extracted, segmented, overrides, units, findings, ref.split_page)
+    mentions = extract_refs(units)
+    result = TextResult(extracted, segmented, overrides, units, findings, ref.split_page, mentions)
     if processed_dir is not None:
         out = processed_dir / entry.source_id
         _write_jsonl(
@@ -86,5 +92,6 @@ def run_text_stages(
             + [{"type": "unit", **asdict(u)} for u in segmented.units],
         )
         _write_jsonl(out / "units.jsonl", (asdict(u) for u in units))
+        _write_jsonl(out / "refs.jsonl", (asdict(m) for m in mentions))
         _write_jsonl(out / "crosscheck.jsonl", (asdict(f) for f in findings))
     return result

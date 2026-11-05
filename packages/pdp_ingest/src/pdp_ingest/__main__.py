@@ -11,10 +11,11 @@ from pdp_ingest.db import register_source
 from pdp_ingest.fetch import fetch_source
 from pdp_ingest.overrides import counts
 from pdp_ingest.pipeline import run_text_stages
+from pdp_ingest.refs_review import refs_markdown
 from pdp_ingest.registry import load_source
 from pdp_ingest.review import read_reviews, review_markdown
 
-STAGES = ("fetch", "extract", "segment", "overrides", "crosscheck")  # extended by M1.3+
+STAGES = ("fetch", "extract", "segment", "overrides", "refs", "crosscheck")  # extended by M1.4+
 
 
 def main() -> None:
@@ -53,6 +54,12 @@ def main() -> None:
     review.write_text(review_markdown(entry, result, reviews), encoding="utf-8")
     flagged = sum(f.needs_review for f in result.findings)
     print(f"crosscheck: {flagged} of {len(result.findings)} units flagged, list in {review}")
+    refs_list = review.parent / "refs.md"
+    refs_list.write_text(
+        refs_markdown(entry.source_id, result.mentions, result.units), encoding="utf-8"
+    )
+    unresolved = sum(m.resolution == "UNRESOLVED" for m in result.mentions)
+    print(f"refs: {len(result.mentions)} mentions, {unresolved} unresolved, list in {refs_list}")
 
     engine = create_engine(PostgresSettings().url())
     try:

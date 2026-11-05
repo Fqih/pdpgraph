@@ -31,6 +31,7 @@ def _short_label(unit: Unit) -> str:
 class LawText:
     def __init__(self, source_id: str, units: list[Unit]) -> None:
         self.source_id = source_id
+        self.units = list(units)
         self._units = {u.unit_id: u for u in units}
         self._pasal: dict[int, list[Unit]] = {}
         self._pj: dict[int, list[Unit]] = {}
