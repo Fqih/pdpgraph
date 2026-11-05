@@ -9,9 +9,10 @@ from sqlalchemy import create_engine
 from common.db import PostgresSettings
 from pdp_ingest.db import register_source
 from pdp_ingest.fetch import fetch_source
-from pdp_ingest.overrides import summary
-from pdp_ingest.pipeline import review_markdown, run_text_stages
+from pdp_ingest.overrides import counts
+from pdp_ingest.pipeline import run_text_stages
 from pdp_ingest.registry import load_source
+from pdp_ingest.review import read_reviews, review_markdown
 
 STAGES = ("fetch", "extract", "segment", "overrides", "crosscheck")  # extended by M1.3+
 
@@ -41,22 +42,27 @@ def main() -> None:
         processed_dir=args.processed_dir,
     )
     kinds = sorted({u.kind for u in result.units})
-    counts = ", ".join(f"{k} {sum(u.kind == k for u in result.units)}" for k in kinds)
+    by_kind = ", ".join(f"{k} {sum(u.kind == k for u in result.units)}" for k in kinds)
     print(f"extract: {len(result.extracted)} blocks")
-    print(f"segment: {len(result.segmented.structures)} structures; units {counts}")
-    print(f"overrides: {dict(summary(result.overrides))}")
+    print(f"segment: {len(result.segmented.structures)} structures; units {by_kind}")
+    total, unconfirmed = counts(result.overrides)
+    print(f"overrides: {total} total, {unconfirmed} unconfirmed")
     review = args.review_dir / entry.source_id / "crosscheck.md"
+    reviews = read_reviews(review.read_text(encoding="utf-8")) if review.is_file() else {}
     review.parent.mkdir(parents=True, exist_ok=True)
-    review.write_text(review_markdown(entry, result), encoding="utf-8")
+    review.write_text(review_markdown(entry, result, reviews), encoding="utf-8")
     flagged = sum(f.needs_review for f in result.findings)
     print(f"crosscheck: {flagged} of {len(result.findings)} units flagged, list in {review}")
 
     engine = create_engine(PostgresSettings().url())
     try:
-        register_source(engine, entry, records[0])
+        register_source(engine, entry, records[0], counts(result.overrides))
     finally:
         engine.dispose()
-    print(f"sources row upserted: {entry.source_id} (body sha256 {entry.primary.body_sha256})")
+    print(
+        f"sources row upserted: {entry.source_id} (body sha256 {entry.primary.body_sha256}, "
+        f"overrides {total}/{unconfirmed} unconfirmed)"
+    )
 
 
 if __name__ == "__main__":

@@ -22,8 +22,8 @@ def _record(
 
 def test_register_source_upserts_the_registry_row(migrated: Engine) -> None:
     entry = load_source("uu27-2022", ROOT / "configs" / "sources")
-    register_source(migrated, entry, _record("2026-11-05T01:00:00+00:00"))
-    register_source(migrated, entry, _record("2026-11-05T02:00:00+00:00"))
+    register_source(migrated, entry, _record("2026-11-05T01:00:00+00:00"), (0, 0))
+    register_source(migrated, entry, _record("2026-11-05T02:00:00+00:00"), (31, 29))
     with migrated.connect() as conn:
         rows = conn.execute(text("SELECT * FROM sources")).mappings().all()
     (row,) = rows
@@ -35,11 +35,12 @@ def test_register_source_upserts_the_registry_row(migrated: Engine) -> None:
     assert row["url"] == "https://jdih.example.go.id/x"
     assert row["fetched_at"].isoformat() == "2026-11-05T02:00:00+00:00"
     assert row["parser_version"].startswith("pdp_ingest@")
+    assert (row["overrides_total"], row["overrides_unconfirmed"]) == (31, 29)
 
 
 def test_local_reuse_keeps_registry_url(migrated: Engine) -> None:
     entry = load_source("uu27-2022", ROOT / "configs" / "sources")
-    register_source(migrated, entry, _record(None, url=None))
+    register_source(migrated, entry, _record(None, url=None), (0, 0))
     with migrated.connect() as conn:
         url = conn.execute(text("SELECT url FROM sources")).scalar_one()
     assert url == str(entry.primary.url)

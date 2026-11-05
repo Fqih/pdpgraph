@@ -7,7 +7,7 @@ Claude Code updates this file at the end of every session. Newest entry on top o
 | Field | Value |
 |---|---|
 | Phase | 1 — PDPGraph MVP (week 1) |
-| Current task | M1.2 done, pending the owner's review list (`data/review/uu27-2022/crosscheck.md`); next per 08: M1.3 |
+| Current task | M1.3 references (after the M1.2 review safeguards, PR #20) |
 | Last updated | 2026-11-05 |
 | Release | none |
 
@@ -21,6 +21,7 @@ Claude Code updates this file at the end of every session. Newest entry on top o
 | M0.4 | done (PR #11) | models-aux fp32 CPU: `/embed`, `/rerank`, `/nli`, dynamic batching; pinned revisions in `configs/models_aux.yaml`; compose `local-llm`; offline runtime |
 | M0.5 | done (PR #8) | `common/llm/`: async `LLMClient`, cassettes (replay/record/live), `UsageLimiter`, one span per call |
 | M0.6 | done (PR #6) | Alembic `0001_initial` = 04 §6 SQL verbatim; `make migrate` idempotent; upgrade/downgrade/re-upgrade tested |
+| M1.2 safeguards | done (PR #20) | `overrides_total`/`overrides_unconfirmed` on `sources` (migration 0002) and in eval reports (06 §7); v0.1 gate needs 0 unconfirmed; review lines in crosscheck.md survive regeneration |
 | M1.2 | done (PR #19) | extract → segment → overrides → crosscheck stages; 519 units; 31 overrides (unconfirmed); 83 units flagged for owner review |
 | M1.1 | done (PR #16) | source registry + `fetch` stage; Komdigi HTML primary (body hash verified), salinan PDF reference; Postgres `sources` row |
 | M0.7 | blocked (billing class per 9router provider prefix pending from owner) | 9router alignment (ADR-016); tracked here only, not in 08-roadmap; does not block other tasks |
@@ -90,7 +91,7 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 
 - M1.2 cross-check: Komdigi transcription errors are corrected in `data/overrides/uu27-2022.yaml` (31 entries, each with the PDF page; `confirmed_by` pending the owner). Three change meaning: "dan" for "dari" in Pasal 20(2)(c), 51(5) and the Penjelasan Umum; Pasal 26(2) lacks "peraturan". The rest are OCR-style typos (hadan, hares, hams, din, balk, anis, tidal(, dikumpullcan, seFuai, PaSal, Edvokasi), split words, and stray periods (Pasal 15(1), 67(1)). Penjelasan Pasal 46 "Ayat 2" (no parentheses) is handled by the segment grammar.
 - **M1.2 cross-check limits:** the PDF text layer is OCR as well, so coverage is a screen, not a verdict; an error shared by both texts is not detected. "menggunakan" is often missing from the PDF layer (Pasal 13, 26, 39), so those diffs are `unclear`. Units under three words have no PDF page (no trigram). Ayat counts in the snapshot agree with the PDF "(n)" markers for 8 of 10 sampled Pasal; Pasal 4 and 70 are garbled in the PDF layer.
-- **M1.2 → owner:** review `data/review/uu27-2022/crosscheck.md`: §1 overrides (set `confirmed_by`), §2 the 10 snapshot units, §3 the 83 flagged units. A Komdigi error found there becomes an override; the review file regenerates on `make ingest` and a snapshot test fails if the committed copy is stale.
+- **M1.2 → owner:** review `data/review/uu27-2022/crosscheck.md` in order: §1 the 4 meaning-changing overrides + Pasal 26(2), §2 the other 27 overrides (set `confirmed_by` in the overrides YAML), §3 the 10 snapshot units, §4 the 83 flagged units (edit the `Review:` line per unit). A Komdigi error found there becomes an override. `make ingest` regenerates the file and keeps the review lines; a malformed line fails the run; a snapshot test fails if the committed copy is stale.
 - `pdp_eval` law view now reads the segmented units (overrides applied), so the labeling CLI shows pipeline ids. `#pj` ids are accepted only where a Penjelasan unit exists (before: any body unit + `#pj`).
 - Amendment research (2026-11-05, `.context/research/2026-11-05-uu27-amendments.md`); decisions recorded (FR-PDP-20, ADR-019). The owner will confirm Lampiran I no. 137 and the guideline verdict illustrations separately:
   - UU 1/2026 Penyesuaian Pidana (effective 2026-01-02) adjusts the fines in Pasal 67(1)–(3) to kategori IV and Pasal 68 to kategori V. Recommended mapping: `SUPERSEDES`; consolidated versions need an ADR, and KUHP Pasal 79 is needed for the rupiah values.
@@ -146,6 +147,7 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 | 2026-11-05 | Golden v0: questions on the 2022 text of Pasal 53(1)(b), 67, 68 and 70(3) are pinned to `as_of = 2025-07-29` and noted "re-label with as_of=today after M4.4". Interplay questions (Pasal 57 with 67–70 via KUHP 613(3); 70(3) with KUHP 121) and the post-ruling Pasal 53 temporal item go to `v0/deferred.jsonl`. New Pasal 74 before/after temporal pair (g-0061/g-0075) | M1.7 |
 | 2026-11-05 | Currency guard FR-PDP-20: `configs/pending_changes.yaml` (UU 1/2026 Lampiran I no. 137; Putusan MK 151/2024; `confirmed_by` pending the owner). Aggregate step in 03 §5.2; implemented in M1.14 with tests and 4 adversarial items | FR-PDP-20 |
 | 2026-11-05 | M1.2 stage artifacts: `extract.jsonl`, `segment.jsonl` (before overrides), `units.jsonl` (overrides applied; input of later stages), `crosscheck.jsonl`. The owner's review list is committed at `data/review/<source_id>/crosscheck.md` (03 §8 tree updated). Overrides are exact single-occurrence text replacements; a stale entry fails the run | M1.2, FR-PDP-01 |
+| 2026-11-05 | M1.2 safeguards (owner): unconfirmed overrides stay applied, but the `sources` row (new columns, migration 0002, 04 §6) and every eval report record `overrides_total`/`overrides_unconfirmed`; 08 v0.1 exit gate requires `overrides_unconfirmed = 0`. Overrides gain `changes_meaning` (4 set). `crosscheck.md` follows the owner's review order (meaning-changing overrides + Pasal 26(2), other 27 overrides, 10 snapshot units, 83 flagged units worst-first); each snapshot/flagged unit has a `Review: reviewed_by: <name> \| verdict: komdigi_ok\|override_needed\|ocr_noise` line that regeneration keeps | M1.2 |
 | 2026-11-05 | pypdf (pure Python, BSD) added to `pdp-ingest` for the PDF text layer; no OCR engine | M1.2 |
 | 2026-11-05 | ADR-019: amendments are separate sources linked by `AMENDS`; consolidated text is `derived: true`, for retrieval only, never cited alone; KUHP 613(3) left as an open question. Implementation M4.4 | ADR-019 |
 

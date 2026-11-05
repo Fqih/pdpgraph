@@ -6,7 +6,7 @@ Needs the verified raw files: `make ingest SOURCE=uu27-2022`, then `make test-sn
 The ayat counts agree with the "(n)" markers in the salinan PDF text layer for every sampled
 Pasal except 4 and 70, where OCR garbles the markers or the heading. The unit texts (overrides
 applied) are pending the owner's check against the PDF page images
-(`data/review/uu27-2022/crosscheck.md` §2).
+(`data/review/uu27-2022/crosscheck.md` §3).
 """
 
 from collections import Counter
@@ -14,8 +14,9 @@ from pathlib import Path
 
 import pytest
 
-from pdp_ingest.pipeline import SNAPSHOT_UNITS, TextResult, review_markdown, run_text_stages
+from pdp_ingest.pipeline import TextResult, run_text_stages
 from pdp_ingest.registry import SourceEntry, load_source
+from pdp_ingest.review import SNAPSHOT_UNITS, read_reviews, review_markdown
 
 pytestmark = [pytest.mark.snapshot, pytest.mark.usefixtures("no_network")]
 
@@ -113,4 +114,5 @@ def test_every_pasal_has_a_penjelasan(result: TextResult) -> None:
 
 def test_committed_review_list_is_current(entry: SourceEntry, result: TextResult) -> None:
     committed = REPO / "data" / "review" / "uu27-2022" / "crosscheck.md"
-    assert committed.read_text(encoding="utf-8") == review_markdown(entry, result)
+    text = committed.read_text(encoding="utf-8")
+    assert text == review_markdown(entry, result, read_reviews(text))

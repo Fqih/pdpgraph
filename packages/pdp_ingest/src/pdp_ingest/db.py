@@ -12,21 +12,27 @@ from pdp_ingest.registry import SourceEntry
 _UPSERT = text(
     """
     INSERT INTO sources (source_id, title, instrument_type, number, year, enacted_on,
-                         promulgated_on, effective_from, url, sha256, fetched_at, parser_version)
+                         promulgated_on, effective_from, url, sha256, fetched_at, parser_version,
+                         overrides_total, overrides_unconfirmed)
     VALUES (:source_id, :title, :instrument_type, :number, :year, :enacted_on,
-            :promulgated_on, :effective_from, :url, :sha256, :fetched_at, :parser_version)
+            :promulgated_on, :effective_from, :url, :sha256, :fetched_at, :parser_version,
+            :overrides_total, :overrides_unconfirmed)
     ON CONFLICT (source_id) DO UPDATE SET
       title = EXCLUDED.title, instrument_type = EXCLUDED.instrument_type,
       number = EXCLUDED.number, year = EXCLUDED.year, enacted_on = EXCLUDED.enacted_on,
       promulgated_on = EXCLUDED.promulgated_on, effective_from = EXCLUDED.effective_from,
       url = EXCLUDED.url, sha256 = EXCLUDED.sha256, fetched_at = EXCLUDED.fetched_at,
-      parser_version = EXCLUDED.parser_version
+      parser_version = EXCLUDED.parser_version, overrides_total = EXCLUDED.overrides_total,
+      overrides_unconfirmed = EXCLUDED.overrides_unconfirmed
     """
 )
 
 
-def register_source(engine: Engine, entry: SourceEntry, primary: dict[str, Any]) -> None:
-    """Upsert the registry row; `sha256` is the verified law-body hash (SEC-14)."""
+def register_source(
+    engine: Engine, entry: SourceEntry, primary: dict[str, Any], overrides: tuple[int, int]
+) -> None:
+    """Upsert the registry row; `sha256` is the verified law-body hash (SEC-14). `overrides` is
+    (total, unconfirmed) for the source's manual overrides file."""
     fetched_at = primary.get("fetched_at")
     params = {
         "source_id": entry.source_id,
@@ -41,6 +47,8 @@ def register_source(engine: Engine, entry: SourceEntry, primary: dict[str, Any])
         "sha256": entry.primary.body_sha256,
         "fetched_at": datetime.fromisoformat(fetched_at) if fetched_at else datetime.now(UTC),
         "parser_version": f"pdp_ingest@{version('pdp-ingest')}",
+        "overrides_total": overrides[0],
+        "overrides_unconfirmed": overrides[1],
     }
     with engine.begin() as conn:
         conn.execute(_UPSERT, params)

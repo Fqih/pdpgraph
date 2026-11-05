@@ -31,6 +31,8 @@ EXPECTED: dict[str, dict[str, tuple[str, bool]]] = {
         "sha256": ("text", False),
         "fetched_at": ("timestamp with time zone", False),
         "parser_version": ("text", False),
+        "overrides_total": ("integer", False),
+        "overrides_unconfirmed": ("integer", False),
     },
     "decision_traces": {
         "request_id": ("uuid", False),
@@ -119,6 +121,8 @@ INDEXES = {
 }
 
 DEFAULTS = {
+    ("sources", "overrides_total"): "0",
+    ("sources", "overrides_unconfirmed"): "0",
     ("decision_traces", "created_at"): "now()",
     ("obligation_review_queue", "status"): "'PENDING'::text",
     ("gw_requests", "ts"): "now()",
