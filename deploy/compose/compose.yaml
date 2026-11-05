@@ -1,0 +1,115 @@
+# SPDX-License-Identifier: Apache-2.0
+# Compose stack (03 §7). Run via the Makefile so `.env` at the repo root is used:
+#   docker compose --project-directory . -f deploy/compose/compose.yaml --profile core up -d
+#
+# Profile `core` = stores only (M0.2). App, local-llm, mock, and obs services are added by the
+# tasks that need them. Store ports are published on 127.0.0.1 only (SEC-15); containers run
+# as non-root with no extra privileges. Memory limits follow the 16 GB budget in 03 §7 [TUNE].
+# Images are pinned by tag and digest (SEC-13).
+
+name: pdpgraph
+
+x-hardening: &hardening
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+  restart: "no"
+
+services:
+  neo4j:
+    <<: *hardening
+    profiles: [core]
+    image: neo4j:5.26.32-community@sha256:249a1ec6e3c52d82101a5ed33d6ed2b5ed5b0017b21a28c0bfebc335e87fb177
+    user: "7474:7474"
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:?set NEO4J_PASSWORD in .env (min 8 chars)}
+      NEO4J_server_memory_heap_initial__size: 1G
+      NEO4J_server_memory_heap_max__size: 1G
+      NEO4J_server_memory_pagecache_size: 512M
+    ports:
+      - "127.0.0.1:7474:7474"
+      - "127.0.0.1:7687:7687"
+    volumes:
+      - neo4j-data:/data
+    mem_limit: 2g
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p \"$${NEO4J_AUTH#neo4j/}\" 'RETURN 1' >/dev/null"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+
+  opensearch:
+    <<: *hardening
+    profiles: [core]
+    image: opensearchproject/opensearch:2.19.7@sha256:3bfa1ec74d56928c2e018033d45c460ce2c0ea65a5cedd577de3102326c31b89
+    environment:
+      discovery.type: single-node
+      bootstrap.memory_lock: "false"
+      OPENSEARCH_JAVA_OPTS: -Xms1g -Xmx1g
+      # Dev only (SEC-15): no security plugin, store reachable only on loopback.
+      DISABLE_SECURITY_PLUGIN: "true"
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      DISABLE_PERFORMANCE_ANALYZER_AGENT_CLI: "true"
+    ulimits:
+      nofile: {soft: 65536, hard: 65536}
+    ports:
+      - "127.0.0.1:9200:9200"
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    mem_limit: 2g
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s' >/dev/null"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+
+  postgres:
+    <<: *hardening
+    profiles: [core]
+    image: postgres:16.15-alpine@sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab
+    user: postgres
+    environment:
+      POSTGRES_USER: pdpgraph
+      POSTGRES_DB: pdpgraph
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "pdpgraph", "-d", "pdpgraph"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  valkey:
+    <<: *hardening
+    profiles: [core]
+    image: valkey/valkey:8.1.11-alpine@sha256:2602ace2be6569bc2bbb06f873776516ab9089821525be34f4305c67eb9db02a
+    user: valkey
+    environment:
+      VALKEY_PASSWORD: ${VALKEY_PASSWORD:?set VALKEY_PASSWORD in .env}
+      REDISCLI_AUTH: ${VALKEY_PASSWORD}
+    # noeviction: budget counters and breaker state must never be evicted (04 §7).
+    command:
+      - sh
+      - -c
+      - exec valkey-server --requirepass "$$VALKEY_PASSWORD" --maxmemory 256mb --maxmemory-policy noeviction --appendonly yes
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - valkey-data:/data
+    mem_limit: 320m
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  neo4j-data:
+  opensearch-data:
+  postgres-data:
+  valkey-data:
