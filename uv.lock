@@ -813,6 +813,18 @@ source = { editable = "packages/pdp_core" }
 name = "pdp-ingest"
 version = "0.0.0"
 source = { editable = "packages/pdp_ingest" }
+dependencies = [
+    { name = "httpx" },
+    { name = "pdpgraph-common" },
+    { name = "pyyaml" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "httpx", specifier = ">=0.28.1,<0.29" },
+    { name = "pdpgraph-common", editable = "packages/common" },
+    { name = "pyyaml", specifier = ">=6.0.3,<7" },
+]
 
 [[package]]
 name = "pdp-mcp"

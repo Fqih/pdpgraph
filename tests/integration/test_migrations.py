@@ -4,17 +4,13 @@
 Runs against a throwaway database on the `core` Postgres. Requires `make up`.
 """
 
-import uuid
-from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
-from sqlalchemy import Engine, create_engine, text
-
-from common.db import PostgresSettings
+from sqlalchemy import Engine, text
 
 pytestmark = pytest.mark.integration
 
@@ -128,24 +124,6 @@ DEFAULTS = {
     ("gw_requests", "ts"): "now()",
     ("gw_requests", "tokens_estimated"): "false",
 }
-
-
-@pytest.fixture
-def engine() -> Iterator[Engine]:
-    """A fresh, empty database for each test, dropped afterwards."""
-    admin_url = PostgresSettings().url()
-    name = f"pdpgraph_migtest_{uuid.uuid4().hex[:12]}"
-    admin = create_engine(admin_url, isolation_level="AUTOCOMMIT")
-    with admin.connect() as conn:
-        conn.execute(text(f'CREATE DATABASE "{name}"'))
-    eng = create_engine(admin_url.set(database=name))
-    try:
-        yield eng
-    finally:
-        eng.dispose()
-        with admin.connect() as conn:
-            conn.execute(text(f'DROP DATABASE "{name}" WITH (FORCE)'))
-        admin.dispose()
 
 
 def _alembic(engine: Engine) -> Config:

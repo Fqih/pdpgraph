@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help sync lint fmt check test cov migrate test-int eval-smoke eval-record up down up-llm up-mock up-obs ingest models-download test-models
+.PHONY: help sync lint fmt check test cov migrate test-int eval-smoke eval-record up down up-llm up-mock up-obs ingest models-download test-models test-snapshot
 
 UV := uv run --frozen
 COMPOSE := docker compose --project-directory . -f deploy/compose/compose.yaml
@@ -48,11 +48,18 @@ MODELS_CACHE ?= $(HOME)/.cache/pdpgraph/models
 models-download: ## Download pinned models-aux weights into $(MODELS_CACHE), outside the repo
 	MODELS_AUX_CACHE_DIR=$(MODELS_CACHE) $(UV) python -m models_aux.download
 
+test-snapshot: ## Ingestion checks on the real sources (needs make ingest)
+	$(UV) pytest -m snapshot -s packages/pdp_ingest
+
 test-models: ## models-aux tests on real weights, offline (needs make models-download)
 	HF_HUB_OFFLINE=1 MODELS_AUX_CACHE_DIR=$(MODELS_CACHE) $(UV) pytest -m models
 
 up-llm: .env ## Compose core + local-llm (models-aux; llama.cpp T1 lands in M2.9)
 	MODELS_AUX_CACHE_DIR=$(MODELS_CACHE) $(COMPOSE) --profile core --profile local-llm up -d --build --wait --wait-timeout 600
+
+ingest: .env ## Ingest a source, e.g. make ingest SOURCE=uu27-2022 (stages so far: fetch; needs make up)
+	@test -n "$(SOURCE)" || { echo "usage: make ingest SOURCE=<source_id>" >&2; exit 1; }
+	$(UV) python -m pdp_ingest --source $(SOURCE)
 
 # Targets below land in later roadmap tasks; they fail loudly until then.
 
@@ -64,6 +71,3 @@ eval-smoke: ## 30-item replay eval (M1.16)
 
 eval-record: ## Re-record LLM cassettes (M1.16; until then run with LLM_MODE=record)
 	@echo "make $@: lands in M1.16" >&2; exit 1
-
-ingest: ## Ingest a source, e.g. make ingest SOURCE=uu27-2022 (M1.1)
-	@echo "make $@: lands in M1.1" >&2; exit 1

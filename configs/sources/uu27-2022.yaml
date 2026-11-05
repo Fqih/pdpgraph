@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: Apache-2.0
+# Source registry entry (04 §1, SEC-14). Owner-approved 2026-11-05: JDIH Komdigi HTML is the
+# primary text source; the salinan PDF is the authoritative cross-check reference (M1.2).
+# Dates from JDIH BPK metadata (Tanggal Penetapan / Pengundangan / Berlaku), checked 2026-11-05;
+# LN 2022/196, TLN 6820. Raw files live in the git-ignored data/raw/.
+source_id: uu27-2022
+title: Undang-Undang Nomor 27 Tahun 2022 tentang Pelindungan Data Pribadi
+instrument_type: UU
+number: 27
+year: 2022
+enacted_on: 2022-10-17
+promulgated_on: 2022-10-17
+effective_from: 2022-10-17
+primary:
+  url: https://jdih.komdigi.go.id/produk_hukum/view/id/832/t/undangundang+nomor+27+tahun+2022
+  format: html
+  # Law body = div#produk-content (title through Penjelasan Pasal 76). The page also carries a
+  # per-Pasal tab widget, which is ignored. Raw bytes differ per fetch only by CSP nonces, so the
+  # registry verifies the body: content invariants first, then the SHA-256 of its canonical form
+  # (pdp_ingest/canonical.py, v1: text blocks, NFC, whitespace collapsed, list structure kept).
+  # snapshot_sha256 names the archived raw page.
+  body_element_id: produk-content
+  extraction_method: html-element-blocks
+  canonicalization_version: 1
+  body_sha256: 0d6f94b59455ace74f3f95e5df2ae6196e83392a4a7438dd6d9f2f7a0e079a40
+  snapshot_sha256: 87a0cbbdf1561b9d1b1694b789aa10fc99bab8e3dccfdca70bc00407945e10d7
+  # Counts checked against the salinan PDF on 2026-11-05: 16 BAB and Pasal 1..76 in the batang
+  # tubuh (the PDF OCR garbles 7 headings, e.g. "Pasa722", "Pasal2T", "Pasal T2", but all 76
+  # are present). "Cukup jelas" = 126 (one block lacks its period on this page).
+  invariants:
+    starts_with: [UNDANG-UNDANG, NOMOR 27 TAHUN 2022, TENTANG, PELINDUNGAN DATA PRIBADI]
+    ends_with: [Pasal 76, Cukup jelas.]
+    explanation_marker: PENJELASAN ATAS UNDANG-UNDANG REPUBLIK INDONESIA NOMOR 27 TAHUN 2022
+    pasal_headings: 76
+    bab_headings: 16
+    cukup_jelas: 126
+    items:
+      - {pasal: 4, path: [3, 3], text: kewarganegaraan;}  # Pasal 4 ayat (3) huruf c
+reference:
+  format: pdf
+  # Scanned salinan (50 pages, 400 dpi, OCR text layer); byte-identical on all four mirrors.
+  sha256: ed952dea04b87d14ecf037f9f324a65d50b396ddd34fc28ddf9ff014391971f6
+  urls:
+    - https://peraturan.bpk.go.id/Download/224884/UU%20Nomor%2027%20Tahun%202022.pdf
+    - https://peraturan.go.id/files/Salinan+UU+Nomor+27+Tahun+2022.pdf
+    - https://jdih.komdigi.go.id/produk_hukum/unduh/id/832/t/undangundang+nomor+27+tahun+2022
+    - https://jdih.kemenkeu.go.id/api/download/46c17b53-4a45-411c-9b76-c6799e5769fc/UU_Nomor_27_Tahun_2022%20Perlindungan%20Data%20Pribadi.pdf
