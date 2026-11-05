@@ -43,6 +43,20 @@ _PATTERNS: dict[PiiKind, re.Pattern[str]] = {
     PiiKind.CARD: re.compile(rf"{_B}\d(?:[ -]?\d){{12,18}}{_E}"),
 }
 
+# Labeled values tolerate adjacency: "NIK3171...", "nik:3171...", "NPWP-01.234...". The label
+# letters (n, i, k, p, w, t) are not hex digits, so hex IDs and UUIDs still never match.
+# Only the value (group "v") is reported and redacted.
+_SEP = r"[\s:.\-]*"
+_LABELED: dict[PiiKind, re.Pattern[str]] = {
+    PiiKind.NIK: re.compile(
+        rf"(?i:nomor\s+induk\s+kependudukan|no\.?\s*ktp|nik|ktp){_SEP}(?P<v>\d{{16}})(?!\d)"
+    ),
+    PiiKind.NPWP: re.compile(
+        rf"(?i:npwp){_SEP}"
+        rf"(?P<v>\d{{2}}\.\d{{3}}\.\d{{3}}\.\d-\d{{3}}\.\d{{3}}|\d{{15,16}})(?!\d)"
+    ),
+}
+
 
 @dataclass(frozen=True, slots=True)
 class PiiMatch:
@@ -69,6 +83,9 @@ def find_pii(text: str) -> list[PiiMatch]:
             if kind is PiiKind.CARD and not luhn_valid(re.sub(r"\D", "", m.group())):
                 continue
             matches.append(PiiMatch(kind, m.start(), m.end()))
+    for kind, pattern in _LABELED.items():
+        matches.extend(PiiMatch(kind, m.start("v"), m.end("v")) for m in pattern.finditer(text))
+    matches = list(dict.fromkeys(matches))  # same kind and span found by both rules
     return sorted(matches, key=lambda m: (m.start, list(PiiKind).index(m.kind)))
 
 

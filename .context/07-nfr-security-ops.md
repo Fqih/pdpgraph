@@ -68,6 +68,7 @@ Assets: company processing-activity data (confidential/PII), API keys, frontier-
 ### 4.1 Tracing (OpenTelemetry)
 
 - SDK in all Python services; `common/telemetry.py` provides `setup_tracing(service_name)` and decorators.
+- No custom span decorator: code uses OTel's `tracer.start_as_current_span(name)` directly as decorator or context manager (sync and async); a per-state span helper, if needed, lands in M1.8.
 - Propagation: W3C `traceparent` from UI → pdp_api → tierline → backends (forwarded as a header to backends; backend-side spans are out of scope).
 - Exporter: OTLP → OTel Collector → Phoenix (dev); Langfuse optional via collector exporter.
 - Follow OpenTelemetry GenAI semantic conventions for model-call spans where available [VERIFY current attribute names].

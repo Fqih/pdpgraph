@@ -49,6 +49,33 @@ NEAR_MISSES = [
 ]
 
 
+# Labeled values are caught even when glued to letters or digits-free separators.
+LABELED: list[tuple[str, PiiKind, str]] = [
+    ("NIK3171012345678901", PiiKind.NIK, "3171012345678901"),
+    ("nik:3171012345678901", PiiKind.NIK, "3171012345678901"),
+    ("NIK-3171012345678901", PiiKind.NIK, "3171012345678901"),
+    ("Nik. 3171012345678901", PiiKind.NIK, "3171012345678901"),
+    ("dataNIK3171012345678901xyz", PiiKind.NIK, "3171012345678901"),
+    ("KTP3171012345678901", PiiKind.NIK, "3171012345678901"),
+    ("No. KTP: 3171012345678901", PiiKind.NIK, "3171012345678901"),
+    ("noktp3171012345678901", PiiKind.NIK, "3171012345678901"),
+    ("Nomor Induk Kependudukan 3171012345678901", PiiKind.NIK, "3171012345678901"),
+    ("NPWP-01.234.567.8-901.234", PiiKind.NPWP, "01.234.567.8-901.234"),
+    ("npwp012345678901234", PiiKind.NPWP, "012345678901234"),
+    ("NPWP:3171012345678901", PiiKind.NPWP, "3171012345678901"),  # 16-digit NPWP (= NIK)
+    ("NPWP 012345678901234abc", PiiKind.NPWP, "012345678901234"),
+]
+
+
+@pytest.mark.parametrize(("text", "kind", "value"), LABELED)
+def test_fr_gw_17_labeled_values_match_even_when_glued(
+    text: str, kind: PiiKind, value: str
+) -> None:
+    hits = [m for m in pii.find_pii(text) if m.kind is kind]
+    assert [text[m.start : m.end] for m in hits] == [value]
+    assert value not in pii.redact_pii(text)
+
+
 @pytest.mark.parametrize(("text", "kind"), POSITIVES)
 def test_fr_gw_17_detects_synthetic_pii(text: str, kind: PiiKind) -> None:
     kinds = {m.kind for m in pii.find_pii(text)}
@@ -104,7 +131,11 @@ def test_fr_gw_17_redaction_leaves_no_detectable_pii(
     assert pii.redact_pii(redacted) == redacted
 
 
-@given(st.from_regex(r"[0-9a-f]{32}|[0-9a-f]{64}", fullmatch=True))
+@given(
+    st.from_regex(r"[0-9a-f]{32}|[0-9a-f]{64}", fullmatch=True)
+    | st.uuids().map(str)
+    | st.uuids().map(lambda u: u.hex.upper())
+)
 def test_sec_16_hex_identifiers_are_never_pii(hex_id: str) -> None:
     # Trace IDs and hashes appear in logs and prompts; they must not escalate or be redacted.
     assert pii.find_pii(f"id {hex_id} end") == []
