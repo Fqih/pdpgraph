@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help sync lint fmt check test test-int eval-smoke up down up-llm up-mock up-obs ingest
+.PHONY: help sync lint fmt check test cov test-int eval-smoke up down up-llm up-mock up-obs ingest
 
 UV := uv run --frozen
 
@@ -23,6 +23,9 @@ check: ## All pre-commit hooks on all files (run before every commit; CI enforce
 
 test: ## Unit + property + contract tests
 	$(UV) pytest
+
+cov: ## Tests + branch coverage gate on deterministic modules (NFR-10: >= 80%)
+	$(UV) pytest --cov=common --cov-branch --cov-report=term-missing --cov-fail-under=80
 
 test-int: ## Integration tests (needs `make up`)
 	$(UV) pytest -m integration

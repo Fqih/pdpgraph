@@ -31,8 +31,8 @@ jobs:
       - name: Lint and type-check
         run: make lint
 
-      - name: Tests
-        run: make test
+      - name: Tests + coverage gate (NFR-10)
+        run: make cov
 
       - name: Pre-commit hygiene hooks
         run: make check
