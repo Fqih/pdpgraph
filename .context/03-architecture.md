@@ -313,6 +313,7 @@ pdpgraph/                       # repo root
 ├── packages/                   # each: pyproject.toml, src/<pkg>/ (with py.typed), tests/
 │   ├── pdp_core/               # schemas, pipeline, retrieval, verification, gap analysis
 │   ├── pdp_ingest/             # ingestion CLI + stages
+│   ├── pdp_eval/               # eval dataset schemas + golden labeling CLI (runners later in evals/harness)
 │   ├── pdp_api/                # FastAPI app (REST + SSE)
 │   ├── pdp_mcp/                # MCP server
 │   ├── tierline/               # gateway: policy, PII scanner, cache, router, dispatcher, accounting

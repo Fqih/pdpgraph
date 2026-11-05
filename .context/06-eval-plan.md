@@ -41,12 +41,17 @@ Target size: 150 (v1) → 300 (v2). Split: `dev` 40% (tuning allowed), `test` 60
  "gold_unit_ids": ["uu27-2022/p46/a1"],
  "acceptable_unit_ids": ["uu27-2022/p46"],
  "gold_answer_points": ["…", "…"],
- "annotator": "A1", "reviewed_by": "R1", "notes": "…"}
+ "annotator": "A1", "reviewed_by": "R1", "notes": "…",
+ "proposed_by": "claude"}
 ```
+
+- `proposed_by` (optional): `claude | faqih | synthetic`, who proposed the question. `schema_version` stays 1 (added before v0 was published).
+- An unlabeled candidate has `gold_verdict: null`, every gold list empty, and no annotator; a labeled item has a verdict, an annotator, ≥ 1 answer point, and ≥ 1 gold unit unless the verdict is `INSUFFICIENT_EVIDENCE` (required for `unanswerable`). Gold units are version-free Pasal-path ids (incl. `#pj`) or `pj-umum`. Model: `packages/pdp_eval/src/pdp_eval/golden.py`.
+- The labeling CLI (`python -m pdp_eval`) logs each labeling act to `annotation-log.jsonl` next to the split (first pass and blind retest) for the test-retest protocol.
 
 Composition targets: ≥ 25% multi-hop (≥ 2 hops), ≥ 10% unanswerable-by-law, ≥ 10% English, ≥ 5% temporal (once implementing regulations exist; otherwise synthetic versions — see §2.3).
 
-**Annotation guideline (`evals/datasets/pdp-golden/GUIDELINE.md`)** must define: what counts as a gold unit (minimal set of units needed to justify the answer), when parent Pasal is acceptable, verdict definitions with examples, how to label unanswerable items, and the double-annotation protocol (≥ 50 items labeled independently by two people → report Cohen's κ on verdict and Jaccard on gold units).
+**Annotation guideline (`evals/datasets/pdp-golden/GUIDELINE.md`)** must define: what counts as a gold unit (minimal set of units needed to justify the answer), when parent Pasal is acceptable, verdict definitions with examples, how to label unanswerable items, and the double-annotation protocol (≥ 50 items labeled independently by two people → report Cohen's κ on verdict and Jaccard on gold units). Until a second annotator exists (v0: owner decision 2026-11-05, none), the guideline instead defines an intra-annotator test-retest protocol (20 random items re-labeled blind ≥ 7 days after the first pass → verdict agreement % and mean Jaccard on gold units, always labeled intra-annotator), and the datasheet states that inter-annotator κ is pending a second annotator in v1.
 
 ### 2.2 `pdp-synth-multihop` (graph-generated)
 

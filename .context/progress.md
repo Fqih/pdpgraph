@@ -7,7 +7,7 @@ Claude Code updates this file at the end of every session. Newest entry on top o
 | Field | Value |
 |---|---|
 | Phase | 1 — PDPGraph MVP (week 1) |
-| Current task | M1.1 in review (PR #16, held for owner confirmation of canonical body hash `0d6f94b5…`); next M1.7 guideline + labeling CLI |
+| Current task | M1.7 in review (golden guideline, datasheet, labeling CLI, 72 candidates); amendment research awaiting owner decision |
 | Last updated | 2026-11-05 |
 | Release | none |
 
@@ -21,7 +21,7 @@ Claude Code updates this file at the end of every session. Newest entry on top o
 | M0.4 | done (PR #11) | models-aux fp32 CPU: `/embed`, `/rerank`, `/nli`, dynamic batching; pinned revisions in `configs/models_aux.yaml`; compose `local-llm`; offline runtime |
 | M0.5 | done (PR #8) | `common/llm/`: async `LLMClient`, cassettes (replay/record/live), `UsageLimiter`, one span per call |
 | M0.6 | done (PR #6) | Alembic `0001_initial` = 04 §6 SQL verbatim; `make migrate` idempotent; upgrade/downgrade/re-upgrade tested |
-| M1.1 | in-progress (PR #16) | source registry + `fetch` stage; Komdigi HTML primary (body hash verified), salinan PDF reference; Postgres `sources` row |
+| M1.1 | done (PR #16) | source registry + `fetch` stage; Komdigi HTML primary (body hash verified), salinan PDF reference; Postgres `sources` row |
 | M0.7 | blocked (billing class per 9router provider prefix pending from owner) | 9router alignment (ADR-016); tracked here only, not in 08-roadmap; does not block other tasks |
 
 Approved order: M0.1 → M0.3 → M0.7 → M0.2 → M0.6 → M0.5 → M0.4.
@@ -84,7 +84,13 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 - Commit `9df2b74` on `main` has author name `FaqihHakim` (GitHub squash merge used the profile display name). Accepted as is by the owner; no history rewrite. Later PRs are squashed to one commit locally and merged with `--rebase`, which keeps the author `Fqih` and still lands one commit per PR.
 
 - M1.2 cross-check: Komdigi transcription errors seen so far: "menguntungkan din sendiri" (for "diri"), "sebagaimana dimaksud dalam." (stray period), Penjelasan Pasal 46 "Ayat 2" (for "Ayat (2)") followed by "Cukup jelas" without period.
-- M4.4 [VERIFY] leads, unconfirmed: UU 1/2026 (Penyesuaian Pidana) may convert UU PDP fines to KUHP categories; a 2025 MK challenge to Pasal 65(2)/67(2) may be pending. Check official sources before modeling.
+- Amendment research (2026-11-05, `.context/research/2026-11-05-uu27-amendments.md`), awaiting the owner's decision after reading the primary texts:
+  - UU 1/2026 Penyesuaian Pidana (effective 2026-01-02) adjusts the fines in Pasal 67(1)–(3) to kategori IV and Pasal 68 to kategori V. Recommended mapping: `SUPERSEDES`; consolidated versions need an ADR, and KUHP Pasal 79 is needed for the rupiah values.
+  - KUHP Pasal 613(3) (added by UU 1/2026) puts administrative sanctions first; its Penjelasan names UU 27/2022. No relation in the 04 model fits.
+  - MK 151/PUU-XXII/2024 confirmed: `MODIFIES_READING` on Pasal 53(1)(b) in M4.4.
+  - PP 33/2026 is promulgated but takes effect 2027-01-16.
+  - The 2025 challenge to Pasal 65(2)/67(2) (135/PUU-XXIII/2025) was rejected on 2026-01-19.
+  - Perkara 236/PUU-XXIV/2026 (Pasal 58(5), 61) appears pending; unconfirmed.
 
 ## Decisions log
 
@@ -119,8 +125,16 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 | 2026-11-05 | `LLMClient` is async (httpx), `LLM_*` settings, mode defaults to `replay`; cassette key = SHA-256 of canonical request incl. attempt; secrets checked before PII; `make eval-record` stub until M1.16 | M0.5, NFR-06, NFR-12 |
 | 2026-11-05 | M1.1 body hash is over a canonical form, not raw inner HTML: `extraction_method: html-element-blocks`, `canonicalization_version: 1` (text blocks, NFC, whitespace collapsed, `[ol]`/`[li]` structure kept; `pdp_ingest/canonical.py`), stored in the registry and `fetch.jsonl`. New UU 27/2022 body hash `0d6f94b59455ace74f3f95e5df2ae6196e83392a4a7438dd6d9f2f7a0e079a40` (replaces `36f26c29…`), pending owner confirmation | M1.1, SEC-14 |
 | 2026-11-05 | Registry-driven content invariants checked on every fetch before the hash: title block start, ends "Pasal 76 / Cukup jelas.", BAB I..XVI and Pasal 1..76 in the batang tubuh, Pasal 1..76 in the Penjelasan, Pasal 4 ayat (3) huruf c = "kewarganegaraan;", "Cukup jelas" = 126. **Correction:** 252 (stated earlier) was the whole-page count; the page carries the law twice (body plus tab widget); the body has 126. Salinan PDF cross-check: 16 BAB and all 76 Pasal headings present (OCR garbles 7, e.g. "Pasa722", "Pasal2T"); OCR finds 112 exact / 123 fuzzy "Cukup jelas", consistent with 126 | M1.1, SEC-14 |
+| 2026-11-05 | Second annotator: none. v0 reports intra-annotator test-retest agreement only; the datasheet says inter-annotator κ is pending a second annotator in v1 | M1.7 |
+| 2026-11-05 | Golden tooling lives in a new workspace package `pdp_eval` (schema model, labeling CLI, test-retest log); 03 §8 updated | M1.7 |
 
 ## Session log
+
+### 2026-11-05 — M1.7 golden guideline + labeling CLI, amendment research
+- PR #16 (M1.1) merged after the owner confirmed body hash `0d6f94b5…` and "Cukup jelas" = 126.
+- M1.7: `packages/pdp_eval` (`golden.py` schema, `law.py` Pasal view with suggested unit ids, `retest.py`, `cli.py`), `evals/datasets/pdp-golden/{GUIDELINE,DATASHEET}.md`, `v0/dev.jsonl` with 72 unlabeled candidates (`proposed_by: claude`, gold fields empty). 54 unit tests; 10 snapshot tests check the suggested ids against the real text.
+- Candidate pool: multi-hop 31.9%, unanswerable 11.1%, English 12.5%, temporal 5.6%. Eight items carry FLAG notes for affected provisions.
+- Amendment research done (report under `.context/research/`). Owner decision pending.
 
 ### 2026-11-05 — Phase 1 kickoff, M1.1
 - PR #12 (local-endpoint check in replay), #13 (bge-m3 safetensors re-pin), #14 (03 §7 memory), #15 (ADR-017 MK rulings, docs) merged.

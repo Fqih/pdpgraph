@@ -1,0 +1,18 @@
+[project]
+name = "pdp-eval"
+version = "0.0.0"
+description = "PDPGraph eval datasets: golden schema and labeling CLI"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "pdp-ingest",
+    "pdpgraph-common",
+    "pydantic>=2.14.2,<3",
+]
+
+[tool.uv.sources]
+pdp-ingest = { workspace = true }
+pdpgraph-common = { workspace = true }
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"
