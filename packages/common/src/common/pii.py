@@ -21,16 +21,26 @@ class PiiKind(StrEnum):
     CARD = "CARD"
 
 
+# Digit-based values must not touch a letter or digit on either side, so digit runs inside
+# hex IDs, hashes, and UUIDs are not mistaken for PII. A value glued to letters
+# ("NIK3171...") is therefore missed; separators (space, ':', '=') still work.
+_B = r"(?<![0-9A-Za-z])"
+_E = r"(?![0-9A-Za-z])"
+
 _PATTERNS: dict[PiiKind, re.Pattern[str]] = {
     # 16-digit Nomor Induk Kependudukan, as a standalone digit run.
-    PiiKind.NIK: re.compile(r"(?<!\d)\d{16}(?!\d)"),
+    PiiKind.NIK: re.compile(rf"{_B}\d{{16}}{_E}"),
     # NPWP: formatted 99.999.999.9-999.999, or a standalone 15-digit run.
-    PiiKind.NPWP: re.compile(r"(?<!\d)(?:\d{2}\.\d{3}\.\d{3}\.\d-\d{3}\.\d{3}|\d{15})(?!\d)"),
+    PiiKind.NPWP: re.compile(
+        rf"{_B}(?:\d{{2}}\.\d{{3}}\.\d{{3}}\.\d-\d{{3}}\.\d{{3}}|\d{{15}}){_E}"
+    ),
     # Indonesian mobile numbers: +62 / 62 / 0, then 8, then 8-11 digits with optional separators.
-    PiiKind.PHONE: re.compile(r"(?<![\d+])(?:\+62[\s-]?|62[\s-]?|0)8\d(?:[\s-]?\d){7,10}(?!\d)"),
+    PiiKind.PHONE: re.compile(
+        rf"(?<![0-9A-Za-z+])(?:\+62[\s-]?|62[\s-]?|0)8\d(?:[\s-]?\d){{7,10}}{_E}"
+    ),
     PiiKind.EMAIL: re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}"),
     # Card-like: 13-19 digits, optional single space/dash separators; Luhn-checked below.
-    PiiKind.CARD: re.compile(r"(?<!\d)\d(?:[ -]?\d){12,18}(?!\d)"),
+    PiiKind.CARD: re.compile(rf"{_B}\d(?:[ -]?\d){{12,18}}{_E}"),
 }
 
 

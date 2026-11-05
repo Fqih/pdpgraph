@@ -17,7 +17,7 @@ Claude Code updates this file at the end of every session. Newest entry on top o
 |---|---|---|
 | M0.1 | done (PR #1) | uv workspace, 8 packages, ruff/mypy/pytest, pre-commit, CI green |
 | M0.2 | todo | |
-| M0.3 | done (PR #3) | config, logging + redaction, telemetry, ids, pii; 137 tests; `make cov` gate |
+| M0.3 | done (PR #3) | config, logging + redaction, telemetry, ids, pii; 142 tests; `make cov` gate |
 | M0.4 | todo | fp32 CPU baseline first; int8/ONNX only as measured optimization with eval delta |
 | M0.5 | todo | |
 | M0.6 | todo | |
@@ -47,7 +47,7 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 - ruff 0.17 formats code blocks inside Markdown by default; ruff config and pre-commit hooks are limited to `.py`/`.pyi` so tooling never rewrites `.context/`.
 - Global `core.hooksPath` on the dev machine points elsewhere, so `pre-commit install` refuses; it stays untouched. Run `make check` before every commit; CI runs the same hooks plus a full-history gitleaks scan.
 - 04 §2.1 grammar is implemented exactly as written (owner-approved): it also accepts `#pj` on Bab/def/obl/`pj-umum` and huruf/angka directly under a Pasal. Tighten only via a spec change.
-- PII patterns (`common/pii.py`) are [TUNE] and favour recall: any standalone 15-digit run (NPWP) and Luhn-valid 13–19 digit run (card) match, so long numeric IDs can trigger escalation. Mobile numbers only; landlines are not detected. Measure the escalation rate on the golden set (ADR-015).
+- PII patterns (`common/pii.py`) are [TUNE] and favour recall: any standalone 15-digit run (NPWP) and Luhn-valid 13–19 digit run (card) match, so long numeric IDs can trigger escalation. Mobile numbers only; landlines are not detected. Digit values must not touch a letter or digit (so hex IDs, hashes, and UUIDs never match — a CI run caught a trace ID being redacted as NPWP); a value glued to letters such as `NIK3171…` is missed. Measure the escalation rate on the golden set (ADR-015).
 - `.env` entries that are not fields of a settings class are ignored (one `.env` serves all services); YAML keys stay strict.
 - 07 §4.1 mentions tracing "decorators": none were added, because OTel's `tracer.start_as_current_span` already works as a decorator for sync and async functions. Owner to confirm whether 07 should say so.
 - Merges: GitHub merge buttons record the profile name as committer, so PRs are merged by fast-forwarding `main` locally after green CI (author and committer stay `Fqih`). `00260f2` has committer `FaqihHakim` from a rebase-merge; left as is.
@@ -80,7 +80,8 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 
 ### 2026-11-05 — M0.3 common
 - `common/`: `config.py` (YAML settings base), `logging.py` (JSON + SEC-12 redaction incl. runtime secret values), `telemetry.py`, `ids.py` (04 §2), `pii.py` (shared PII patterns), `errors.py`.
-- Tests first (RED on import, then GREEN): 137 pass; branch coverage 98.89%.
+- Tests first (RED on import, then GREEN): 142 pass; branch coverage 98.89%.
+- CI found a PII false positive inside a random trace ID; fixed at the root (identifier-safe boundaries) with regression and property tests.
 - Licensing and `make check` landed in PR #2.
 
 ### 2026-11-05 — M0.1 scaffold

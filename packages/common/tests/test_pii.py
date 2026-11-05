@@ -41,6 +41,11 @@ NEAR_MISSES = [
     "kartu 4111 1111 1111 1112",  # grouped digits failing Luhn
     "user@localhost",  # no TLD
     "Rp 1.500.000,00",
+    # Digit runs inside identifiers are not PII (regression: CI run 41962135000).
+    "trace a817ff3c188e7f68a376158472152526",
+    "sha256 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+    "sha 0e3171012345678901ab and x4111111111111111y",
+    "uuid 123e4567-e89b-12d3-a456-426614174000",
 ]
 
 
@@ -97,3 +102,9 @@ def test_fr_gw_17_redaction_leaves_no_detectable_pii(
     redacted = pii.redact_pii(text)
     assert pii.find_pii(redacted) == []
     assert pii.redact_pii(redacted) == redacted
+
+
+@given(st.from_regex(r"[0-9a-f]{32}|[0-9a-f]{64}", fullmatch=True))
+def test_sec_16_hex_identifiers_are_never_pii(hex_id: str) -> None:
+    # Trace IDs and hashes appear in logs and prompts; they must not escalate or be redacted.
+    assert pii.find_pii(f"id {hex_id} end") == []
