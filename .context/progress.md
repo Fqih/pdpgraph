@@ -7,7 +7,7 @@ Claude Code updates this file at the end of every session. Newest entry on top o
 | Field | Value |
 |---|---|
 | Phase | 1 — PDPGraph MVP (week 1) |
-| Current task | M1.1 in review (PR #16, held for owner confirmation of corrected body hash); next M1.7 guideline + labeling CLI |
+| Current task | M1.1 in review (PR #16, held for owner confirmation of canonical body hash `0d6f94b5…`); next M1.7 guideline + labeling CLI |
 | Last updated | 2026-11-05 |
 | Release | none |
 
@@ -83,6 +83,9 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 - Merges use the GitHub squash-merge button (owner decision); the recorded author/committer name is accepted as is. PR #3 was squash-merged locally (`8f03aa0`) and shows as closed.
 - Commit `9df2b74` on `main` has author name `FaqihHakim` (GitHub squash merge used the profile display name). Accepted as is by the owner; no history rewrite. Later PRs are squashed to one commit locally and merged with `--rebase`, which keeps the author `Fqih` and still lands one commit per PR.
 
+- M1.2 cross-check: Komdigi transcription errors seen so far: "menguntungkan din sendiri" (for "diri"), "sebagaimana dimaksud dalam." (stray period), Penjelasan Pasal 46 "Ayat 2" (for "Ayat (2)") followed by "Cukup jelas" without period.
+- M4.4 [VERIFY] leads, unconfirmed: UU 1/2026 (Penyesuaian Pidana) may convert UU PDP fines to KUHP categories; a 2025 MK challenge to Pasal 65(2)/67(2) may be pending. Check official sources before modeling.
+
 ## Decisions log
 
 | Date | Decision | Where |
@@ -114,12 +117,15 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 | 2026-11-05 | Golden schema gains optional `proposed_by ∈ {claude, faqih, synthetic}`; `schema_version` stays 1 (unpublished); lands with the M1.7 schema model and 06 §2.1 update | M1.7 |
 | 2026-11-05 | `LLMClient` fails closed: `confidential`/`pii` only to hosts in `local_base_urls`, in every mode incl. replay; never relax | ADR-013, ADR-015 |
 | 2026-11-05 | `LLMClient` is async (httpx), `LLM_*` settings, mode defaults to `replay`; cassette key = SHA-256 of canonical request incl. attempt; secrets checked before PII; `make eval-record` stub until M1.16 | M0.5, NFR-06, NFR-12 |
+| 2026-11-05 | M1.1 body hash is over a canonical form, not raw inner HTML: `extraction_method: html-element-blocks`, `canonicalization_version: 1` (text blocks, NFC, whitespace collapsed, `[ol]`/`[li]` structure kept; `pdp_ingest/canonical.py`), stored in the registry and `fetch.jsonl`. New UU 27/2022 body hash `0d6f94b59455ace74f3f95e5df2ae6196e83392a4a7438dd6d9f2f7a0e079a40` (replaces `36f26c29…`), pending owner confirmation | M1.1, SEC-14 |
+| 2026-11-05 | Registry-driven content invariants checked on every fetch before the hash: title block start, ends "Pasal 76 / Cukup jelas.", BAB I..XVI and Pasal 1..76 in the batang tubuh, Pasal 1..76 in the Penjelasan, Pasal 4 ayat (3) huruf c = "kewarganegaraan;", "Cukup jelas" = 126. **Correction:** 252 (stated earlier) was the whole-page count; the page carries the law twice (body plus tab widget); the body has 126. Salinan PDF cross-check: 16 BAB and all 76 Pasal headings present (OCR garbles 7, e.g. "Pasa722", "Pasal2T"); OCR finds 112 exact / 123 fuzzy "Cukup jelas", consistent with 126 | M1.1, SEC-14 |
 
 ## Session log
 
 ### 2026-11-05 — Phase 1 kickoff, M1.1
 - PR #12 (local-endpoint check in replay), #13 (bge-m3 safetensors re-pin), #14 (03 §7 memory), #15 (ADR-017 MK rulings, docs) merged.
 - M1.1: `pdp_ingest` `registry.py`, `fetch.py`, `db.py`, `__main__.py`; `configs/sources/uu27-2022.yaml`; `make ingest`; integration DB fixture moved to `tests/integration/conftest.py`. Tests first: 22 unit (respx + socket guard) + 2 integration.
+- M1.1 follow-up: canonicalization v1 + content invariants (`canonical.py`); `make test-snapshot` runs the checks on the real snapshot (2 passed). Unit tests 318 passed; `pdp_ingest` coverage 87%.
 
 ### 2026-11-05 — M0.4 models-aux, plus M0.5 follow-ups
 - PR #9: spec-drift message now starts "04 §6 changed: write a new migration revision"; follow-ups logged. PR #10: `LLMClient` local-only guard for `confidential`/`pii`.

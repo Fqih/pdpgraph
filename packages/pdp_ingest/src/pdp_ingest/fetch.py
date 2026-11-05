@@ -17,6 +17,14 @@ from typing import Any
 
 import httpx
 
+from pdp_ingest.canonical import (
+    CANONICALIZATION_VERSION,
+    EXTRACTION_METHOD,
+    InvariantError,
+    blocks,
+    canonical_sha256,
+    check_invariants,
+)
 from pdp_ingest.registry import SourceEntry
 
 MAX_BYTES = 50 * 1024 * 1024
@@ -45,8 +53,25 @@ def element_inner_html(page: str, element_id: str) -> str:
     raise SourceIntegrityError(f"element {element_id!r} is not closed")
 
 
-def body_sha256(page_bytes: bytes, element_id: str) -> str:
-    return sha256(element_inner_html(page_bytes.decode("utf-8"), element_id).encode("utf-8"))
+def verify_body(page_bytes: bytes, entry: SourceEntry, label: str) -> dict[str, Any]:
+    """Check the content invariants, then the canonical body hash; return the record fields."""
+    body = element_inner_html(page_bytes.decode("utf-8"), entry.primary.body_element_id)
+    try:
+        report = check_invariants(blocks(body), entry.primary.invariants)
+    except InvariantError as exc:
+        raise SourceIntegrityError(f"{label}: content invariant failed: {exc}") from exc
+    digest = canonical_sha256(body)
+    if digest != entry.primary.body_sha256:
+        raise SourceIntegrityError(
+            f"{label}: law body sha256 {digest[:12]} does not match the registry "
+            f"({entry.primary.body_sha256[:12]}); review the upstream change and re-pin"
+        )
+    return {
+        "body_sha256": digest,
+        "extraction_method": EXTRACTION_METHOD,
+        "canonicalization_version": CANONICALIZATION_VERSION,
+        "invariants": report,
+    }
 
 
 def _get(client: httpx.Client, url: str) -> tuple[bytes, httpx.Response]:
@@ -79,20 +104,18 @@ def _record(
     }
 
 
-def _verified_html(path: Path, entry: SourceEntry) -> bytes:
+def _verified_html(path: Path, entry: SourceEntry) -> tuple[bytes, dict[str, Any]]:
     data = path.read_bytes()
     if sha256(data) != path.stem:
         raise SourceIntegrityError(f"{path.name}: content does not match its file name hash")
-    if body_sha256(data, entry.primary.body_element_id) != entry.primary.body_sha256:
-        raise SourceIntegrityError(f"{path.name}: law body does not match the registry")
-    return data
+    return data, verify_body(data, entry, path.name)
 
 
-def _local_html(raw: Path, entry: SourceEntry) -> tuple[Path, bytes] | None:
+def _local_html(raw: Path, entry: SourceEntry) -> tuple[Path, bytes, dict[str, Any]] | None:
     pinned = raw / f"{entry.primary.snapshot_sha256}.html"
     candidates = sorted(raw.glob("*.html"), key=lambda p: p != pinned)  # pinned first
     for path in candidates:
-        return path, _verified_html(path, entry)  # any present file must verify (no skipping)
+        return path, *_verified_html(path, entry)  # any present file must verify (no skipping)
     return None
 
 
@@ -109,18 +132,11 @@ def _local_pdf(raw: Path, entry: SourceEntry) -> bytes | None:
 def _primary(client: httpx.Client, raw: Path, entry: SourceEntry) -> tuple[bytes, dict[str, Any]]:
     local = _local_html(raw, entry)
     if local is not None:
-        path, data = local
+        path, data, verified = local
         pinned = path.stem == entry.primary.snapshot_sha256
-        record = _record("primary", data, None, body_sha256=entry.primary.body_sha256)
-        return data, record | {"pinned_snapshot": pinned}
+        return data, _record("primary", data, None, **verified) | {"pinned_snapshot": pinned}
     data, response = _get(client, str(entry.primary.url))
-    body = body_sha256(data, entry.primary.body_element_id)
-    if body != entry.primary.body_sha256:
-        raise SourceIntegrityError(
-            f"{entry.source_id}: law body sha256 {body[:12]} does not match the registry "
-            f"({entry.primary.body_sha256[:12]}); review the upstream change and re-pin"
-        )
-    record = _record("primary", data, response, body_sha256=body)
+    record = _record("primary", data, response, **verify_body(data, entry, entry.source_id))
     return data, record | {"pinned_snapshot": sha256(data) == entry.primary.snapshot_sha256}
 
 
@@ -150,8 +166,12 @@ def _write(path: Path, data: bytes) -> None:
     tmp.replace(path)
 
 
+_DOWNLOAD_FIELDS = ("url", "fetched_at", "http_status", "content_type", "etag", "last_modified")
+
+
 def _carry_forward(records: list[dict[str, Any]], log_path: Path) -> list[dict[str, Any]]:
-    """A reused local file keeps the provenance of the download that produced it."""
+    """A reused local file keeps the provenance of the download that produced it; verification
+    fields always come from the current run."""
     if not log_path.is_file():
         return records
     prior = {}
@@ -162,7 +182,7 @@ def _carry_forward(records: list[dict[str, Any]], log_path: Path) -> list[dict[s
     for rec in records:
         earlier = prior.get((rec["role"], rec["raw_sha256"]))
         if rec["url"] is None and earlier is not None:
-            rec = {**earlier, **{k: v for k, v in rec.items() if k == "pinned_snapshot"}}
+            rec = rec | {k: earlier.get(k) for k in _DOWNLOAD_FIELDS}
         out.append(rec)
     return out
 

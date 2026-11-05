@@ -8,6 +8,8 @@ from typing import Annotated, Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, StringConstraints, field_validator
 
+from pdp_ingest.canonical import ContentInvariants
+
 Sha256 = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
 InstrumentType = Literal["UU", "PP", "PERPRES", "PERMEN", "PERBAN", "PUTUSAN_MK", "OTHER"]
 
@@ -23,13 +25,17 @@ class _Strict(BaseModel):
 
 
 class PrimarySource(_Strict):
-    """Text source. The registry verifies the law body: the inner HTML of `body_element_id`.
+    """Text source. The registry verifies the law body: the canonical form (`canonical.py`) of
+    the inner HTML of `body_element_id`, checked against `invariants` and `body_sha256`.
     `snapshot_sha256` identifies the archived raw page (raw bytes vary per fetch)."""
 
     url: HttpUrl
     format: Literal["html"]
     body_element_id: str = Field(min_length=1)
+    extraction_method: Literal["html-element-blocks"]
+    canonicalization_version: Literal[1]
     body_sha256: Sha256
+    invariants: ContentInvariants
     snapshot_sha256: Sha256
 
     _https = field_validator("url")(_https)

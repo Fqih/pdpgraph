@@ -18,7 +18,10 @@ def test_uu27_entry_pins_body_snapshot_and_reference() -> None:
     assert str(entry.promulgated_on) == "2022-10-17"
     assert entry.primary.format == "html"
     assert entry.primary.body_element_id == "produk-content"
-    assert entry.primary.body_sha256.startswith("36f26c29")
+    assert entry.primary.extraction_method == "html-element-blocks"
+    assert entry.primary.canonicalization_version == 1
+    assert entry.primary.body_sha256.startswith("0d6f94b5")
+    assert entry.primary.invariants.pasal_headings == 76
     assert entry.reference.sha256.startswith("ed952dea")
     assert len(entry.reference.urls) >= 2
 
@@ -42,8 +45,18 @@ def _entry(**overrides: object) -> dict[str, object]:
             "url": "https://example.go.id/x",
             "format": "html",
             "body_element_id": "c",
+            "extraction_method": "html-element-blocks",
+            "canonicalization_version": 1,
             "body_sha256": "a" * 64,
             "snapshot_sha256": "b" * 64,
+            "invariants": {
+                "starts_with": ["UU"],
+                "ends_with": ["Cukup jelas."],
+                "explanation_marker": "PENJELASAN",
+                "pasal_headings": 1,
+                "bab_headings": 1,
+                "cukup_jelas": 1,
+            },
         },
         "reference": {"format": "pdf", "sha256": "c" * 64, "urls": ["https://example.go.id/r.pdf"]},
     }
@@ -58,6 +71,8 @@ def _entry(**overrides: object) -> dict[str, object]:
         {"instrument_type": "LAW"},
         {"primary": {**_entry()["primary"], "body_sha256": "abc"}},  # type: ignore[dict-item]
         {"primary": {**_entry()["primary"], "url": "http://example.go.id/x"}},  # type: ignore[dict-item]
+        {"primary": {**_entry()["primary"], "canonicalization_version": 2}},  # type: ignore[dict-item]
+        {"primary": {**_entry()["primary"], "extraction_method": "raw"}},  # type: ignore[dict-item]
         {"reference": {"format": "pdf", "sha256": "c" * 64, "urls": []}},
         {"extra": 1},
     ],

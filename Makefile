@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help sync lint fmt check test cov migrate test-int eval-smoke eval-record up down up-llm up-mock up-obs ingest models-download test-models
+.PHONY: help sync lint fmt check test cov migrate test-int eval-smoke eval-record up down up-llm up-mock up-obs ingest models-download test-models test-snapshot
 
 UV := uv run --frozen
 COMPOSE := docker compose --project-directory . -f deploy/compose/compose.yaml
@@ -47,6 +47,9 @@ MODELS_CACHE ?= $(HOME)/.cache/pdpgraph/models
 
 models-download: ## Download pinned models-aux weights into $(MODELS_CACHE), outside the repo
 	MODELS_AUX_CACHE_DIR=$(MODELS_CACHE) $(UV) python -m models_aux.download
+
+test-snapshot: ## Ingestion checks on the real sources (needs make ingest)
+	$(UV) pytest -m snapshot -s packages/pdp_ingest
 
 test-models: ## models-aux tests on real weights, offline (needs make models-download)
 	HF_HUB_OFFLINE=1 MODELS_AUX_CACHE_DIR=$(MODELS_CACHE) $(UV) pytest -m models
