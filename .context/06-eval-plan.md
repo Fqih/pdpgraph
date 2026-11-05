@@ -96,6 +96,17 @@ Pass criterion per item defined in the item (`expected_behavior: abstain|correct
 
 Request traces with realistic distributions: prompt-length histogram from `router-prompts`, Poisson arrivals with bursts, a mix of streaming/non-streaming and data classes.
 
+### 2.9 `pdp-refs` (reference resolver, M1.3)
+
+Ground truth for the `refs` stage (FR-PDP-03), labeled by the owner only. `evals/datasets/pdp-refs/v0/sample.jsonl`, built once by `uv run python -m pdp_eval refs-sample` (seed recorded):
+
+- **50 mentions**, stratified by pattern type (`absolute`, `relative`, `list`, `range`, `sebagaimana`, `self`, `external`, `delegation`, `penjelasan`; multi-label), at least 5 per type where the source has that many, the rest random;
+- **20 negative sentences**: random sentences (≥ 6 words, distinct) in which the resolver found no mention; they measure missed references.
+
+Labeling (`refs-label`) shows each mention in its sentence with the proposed targets. Mentions: `correct` / `wrong` (with the right targets) / `not_reference`. Negatives: `no_reference` / `missed` (with the missed targets). Targets are unit ids, or `SELF`, `EXTERNAL`, `DELEGATION` for mentions without an internal unit. Gold targets are stored independently of the resolver.
+
+Metrics (`refs-report`): the current resolver is re-run and compared on the labeled spans at target level: TP/FP/FN, precision, recall, plus exact-match items, per pattern type, for negatives, and overall. Ranges count one target per unit. Targets: **recall ≥ 95%, precision ≥ 98%** [TARGET]; precision matters more, because a false `REFERENCES` edge pulls unrelated units into graph expansion. Resolver changes after labeling are re-scored on the same labels; tuning the grammar on the labeled sample is allowed (it is a dev set), so a fresh sample is drawn before any public claim.
+
 ## 3. Metric definitions
 
 Let `C` = set of unit IDs cited in the response (after verification), `G` = gold unit IDs, `A` = acceptable unit IDs (superset including parents). A cited unit counts as correct if it is in `G ∪ A`, normalized to `unit_id`.

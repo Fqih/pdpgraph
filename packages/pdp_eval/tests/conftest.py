@@ -5,7 +5,7 @@ import pytest
 
 from pdp_eval.law import LawText
 from pdp_ingest.canonical import blocks
-from pdp_ingest.segment import segment
+from pdp_ingest.segment import Unit, segment
 
 HTML = (
     "<p>UNDANG-UNDANG</p><p>BAB I</p><p>KETENTUAN UMUM</p>"
@@ -21,6 +21,28 @@ HTML = (
     "<p>Pasal 1</p><p>Cukup jelas.</p><p>Pasal 2</p><p>Ayat (1)</p><p>Huruf b</p>"
     "<p>Akibat hukum.</p><p>Pasal 3</p><p>Cukup jelas.</p>"
 )
+
+
+# A small law with every reference kind, for the reference sample tests (M1.3).
+REFS_HTML = (
+    "<p>BAB I</p><p>UMUM</p>"
+    "<p>Pasal 1</p><p>Pengendali wajib menjaga data dengan cara yang aman dan patut. "
+    "Hal ini berlaku menurut Undang-Undang ini.</p>"
+    "<p>Pasal 2</p><ol><li><p>Prosesor wajib membantu Pengendali sebagaimana dimaksud dalam "
+    "Pasal 1.</p></li><li><p>Ketentuan sebagaimana dimaksud pada ayat (1) diatur dalam Peraturan "
+    "Pemerintah.</p></li></ol>"
+    "<p>Pasal 3</p><p>Pelanggaran Pasal 1 sampai dengan Pasal 2 dikenai sanksi administratif yang "
+    "ditetapkan oleh lembaga yang berwenang.</p>"
+    "<p>PENJELASAN</p><p>I UMUM</p><p>Penjelasan umum ini menguraikan latar belakang dan tujuan "
+    "pengaturan secara lengkap.</p><p>II PASAL DEMI PASAL</p>"
+    "<p>Pasal 1</p><p>Cukup jelas.</p><p>Pasal 2</p><p>Cukup jelas.</p><p>Pasal 3</p>"
+    "<p>Cukup jelas.</p>"
+)
+
+
+@pytest.fixture
+def ref_units() -> list[Unit]:
+    return segment("s", blocks(REFS_HTML), explanation_marker="PENJELASAN").units
 
 
 @pytest.fixture

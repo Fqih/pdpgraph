@@ -128,7 +128,7 @@ Stages are idempotent; each writes an artifact under `data/processed/<source_id>
 | `segment` | Lines → hierarchy tree (Bab/Bagian/Paragraf/Pasal/Ayat/huruf) using a grammar-based state machine over line patterns (e.g., `^BAB [IVXLC]+`, `^Pasal \d+`, `^\(\d+\)`, `^[a-z]\.`) | Yes |
 | `penjelasan` | Penjelasan section → mapped to Pasal/ayat by header ("Pasal 20 Ayat (2) ...", "Cukup jelas") | Yes |
 | `ids` | Tree → stable node IDs (04-data-model §2) | Yes |
-| `refs` | Text → reference mentions via regex grammar (Pasal X, ayat (Y), huruf z, "Undang-Undang ini", external laws) → resolved targets | Yes; unresolved logged |
+| `refs` | Text → reference mentions via regex grammar (Pasal X, ayat (Y), huruf z, lists, ranges, "Undang-Undang ini", external laws, delegation phrases) → resolved targets (04 §3.7) | Yes; unresolved logged in `data/review/<id>/refs.md` |
 | `defs` | Definitional articles → `Definition` nodes; term matcher links usages (normalized, morphology-light matching) | Yes |
 | `obligations` | Paragraph text → `Obligation` candidates via LLM (Tierline, data class `public`, guided JSON) → validation → review queue | LLM + schema |
 | `load_graph` | All artifacts → Neo4j (MERGE on IDs; transactional) | Yes |

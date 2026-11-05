@@ -156,6 +156,23 @@ The official text of a source is never overwritten. An amending instrument (e.g.
 - Until an amendment is modeled, the currency guard (FR-PDP-20, `configs/pending_changes.yaml`) keeps the pipeline from answering with the superseded text.
 - Implementation is M4.4.
 
+### 3.7 Reference mentions (`refs` stage, M1.3)
+
+`data/processed/<source_id>/refs.jsonl`, one row per mention:
+
+| Field | Meaning |
+|---|---|
+| `unit_id` | Unit whose text contains the mention |
+| `start`, `end`, `text` | Char span in the unit text (overrides applied) and the raw text, including a "sebagaimana dimaksud dalam/pada" prefix and an "Undang-Undang ini" or instrument suffix |
+| `kind` | `REFERENCE` or `DELEGATION` ("diatur dengan/dalam Peraturan Pemerintah/Presiden/…") |
+| `resolution` | `EXACT` (every item resolved), `UNRESOLVED` (an internal item has no unit; logged, FR-PDP-03), `SELF` ("Undang-Undang ini" alone), `EXTERNAL_UNRESOLVED` (external instrument, and every delegation) |
+| `targets` | Internal unit ids, ranges expanded to one id per unit |
+| `instrument` | External or delegated instrument as written |
+| `patterns` | Sampling strata (06 §2.9) |
+| `unresolved` | Internal items without a unit |
+
+A mention is one chain of items joined by lists or ranges. Relative items take missing upper levels from the previous item, else from the context unit (the explained unit for a Penjelasan). `load_graph` (M1.5) creates one `REFERENCES {mention_text, resolution: EXACT}` edge per target of a `REFERENCES`-kind mention. `SELF` and `UNRESOLVED` items create no edge. `DELEGATION` creates no edge until the delegated instrument (PP 33/2026) is ingested. `PARENT` is not produced by the v1 resolver. The committed list of unresolved, external, delegation and self mentions is `data/review/<source_id>/refs.md`.
+
 ## 4. Search index (OpenSearch)
 
 Index `legal_units_v{n}` (aliased as `legal_units`), one document per citable `LegalUnit` of kind `PASAL` (only when it has no ayat), `AYAT`, `HURUF`, `ANGKA`.
