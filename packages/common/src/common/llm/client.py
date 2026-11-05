@@ -18,9 +18,14 @@ from opentelemetry.trace import Span, Status, StatusCode, Tracer
 from pydantic import BaseModel, Field, ValidationError
 
 from common.llm.cassette import CassetteStore, canonical_request, cassette_key, check_recordable
-from common.llm.errors import CassetteMissError, LLMHTTPError, OutputValidationError
+from common.llm.errors import (
+    CassetteMissError,
+    LLMHTTPError,
+    LocalOnlyDataClassError,
+    OutputValidationError,
+)
 from common.llm.limiter import UsageLimiter
-from common.llm.settings import DataClass, LLMSettings
+from common.llm.settings import LOCAL_ONLY, DataClass, LLMSettings
 
 RETRY_PROMPT = (
     "Your previous reply did not match the required JSON schema:\n{errors}\n"
@@ -115,6 +120,15 @@ class LLMClient:
         attempt: int = 1,
     ) -> Completion:
         data_class = DataClass(data_class)
+        # Fail closed before anything is built. Replay sends nothing, so it is exempt.
+        if (
+            self._settings.mode != "replay"
+            and data_class in LOCAL_ONLY
+            and not self._settings.is_local_endpoint()
+        ):
+            raise LocalOnlyDataClassError(
+                f"data_class={data_class} may only be sent to a local endpoint (ADR-013/015)"
+            )
         request = canonical_request(
             model=model or self._settings.model,
             messages=messages,

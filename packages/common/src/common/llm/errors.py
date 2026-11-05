@@ -24,3 +24,7 @@ class CassetteWriteRefusedError(LLMError):
 
 class UsageLimitExceededError(LLMError):
     """A shared call or token cap was reached."""
+
+
+class LocalOnlyDataClassError(LLMError):
+    """A confidential/pii call targeted an endpoint outside `local_base_urls` (ADR-013/015)."""

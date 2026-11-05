@@ -20,6 +20,7 @@ from common.llm import (
     LLMClient,
     LLMHTTPError,
     LLMSettings,
+    LocalOnlyDataClassError,
     OutputValidationError,
     UsageLimiter,
     UsageLimitExceededError,
@@ -262,8 +263,9 @@ async def test_replay_miss_raises_and_never_calls_upstream(
 
 
 async def test_record_refuses_pii_before_calling(tmp_path: Path, mock: respx.MockRouter) -> None:
-    route = mock.post(URL).mock(return_value=_reply("ok"))
-    async with LLMClient(_settings(tmp_path, mode="record")) as client:
+    local = "http://127.0.0.1:8080/v1"  # local, so the cassette guard (not the locality guard) acts
+    route = mock.post(f"{local}/chat/completions").mock(return_value=_reply("ok"))
+    async with LLMClient(_settings(tmp_path, mode="record", base_url=local)) as client:
         with pytest.raises(CassetteWriteRefusedError, match="pii"):
             await client.complete(MESSAGES, data_class=DataClass.PII)
         with pytest.raises(CassetteWriteRefusedError, match="PII"):
@@ -367,3 +369,80 @@ async def test_replay_span_marks_hit_and_errors_carry_type_only(
     assert miss.attributes["llm.cassette"] == "miss"
     assert miss.attributes["error.type"] == "CassetteMissError"
     assert miss.events == ()
+
+
+# --- local-only data classes (ADR-013/015) ---------------------------------------------------
+
+LOCAL_ONLY = [DataClass.CONFIDENTIAL, DataClass.PII]
+
+
+def test_local_endpoints_default_to_loopback(tmp_path: Path) -> None:
+    assert set(_settings(tmp_path).local_base_urls) == {"127.0.0.1", "::1", "localhost"}
+
+
+@pytest.mark.parametrize("mode", ["live", "record"])
+@pytest.mark.parametrize("data_class", LOCAL_ONLY)
+async def test_external_endpoint_refuses_local_only_classes(
+    tmp_path: Path,
+    mock: respx.MockRouter,
+    spans: tuple[TracerProvider, InMemorySpanExporter],
+    mode: str,
+    data_class: DataClass,
+) -> None:
+    provider, exporter = spans
+    route = mock.post(URL).mock(return_value=_reply("ok"))
+    limiter = UsageLimiter(max_calls=5, max_total_tokens=100)
+    settings = _settings(tmp_path, mode=mode)
+    async with LLMClient(settings, limiter=limiter, tracer=provider.get_tracer("t")) as client:
+        with pytest.raises(
+            LocalOnlyDataClassError,
+            match=rf"^data_class={data_class} may only be sent to a local endpoint "
+            r"\(ADR-013/015\)$",
+        ):
+            await client.complete(MESSAGES, data_class=data_class)
+    assert route.call_count == 0
+    assert limiter.calls == 0
+    assert exporter.get_finished_spans() == ()  # refused before the request is built
+    assert not (tmp_path / "unit").exists()
+
+
+async def test_guard_matches_host_not_substring(tmp_path: Path, mock: respx.MockRouter) -> None:
+    url = "https://localhost.evil.invalid/v1"
+    route = mock.post(f"{url}/chat/completions").mock(return_value=_reply("ok"))
+    async with LLMClient(_settings(tmp_path, base_url=url)) as client:
+        with pytest.raises(LocalOnlyDataClassError):
+            await client.complete(MESSAGES, data_class=DataClass.CONFIDENTIAL)
+    assert route.call_count == 0
+
+
+@pytest.mark.parametrize(
+    "base_url", ["http://127.0.0.1:8080/v1", "http://[::1]:8080/v1", "http://LOCALHOST:8080/v1"]
+)
+async def test_loopback_allows_confidential(
+    tmp_path: Path, mock: respx.MockRouter, base_url: str
+) -> None:
+    route = mock.post(f"{base_url.lower()}/chat/completions").mock(return_value=_reply("ok"))
+    async with LLMClient(_settings(tmp_path, base_url=base_url)) as client:
+        result = await client.complete(MESSAGES, data_class=DataClass.CONFIDENTIAL)
+    assert result.content == "ok"
+    assert route.call_count == 1
+
+
+async def test_configured_local_host_allows_confidential(
+    tmp_path: Path, mock: respx.MockRouter
+) -> None:
+    url = "http://llama-t1:8080/v1"
+    mock.post(f"{url}/chat/completions").mock(return_value=_reply("ok"))
+    settings = _settings(tmp_path, base_url=url, local_base_urls=["llama-t1"])
+    async with LLMClient(settings) as client:
+        await client.complete(MESSAGES, data_class=DataClass.CONFIDENTIAL)
+
+
+@pytest.mark.parametrize("data_class", [DataClass.PUBLIC, DataClass.INTERNAL])
+async def test_public_and_internal_unaffected(
+    tmp_path: Path, mock: respx.MockRouter, data_class: DataClass
+) -> None:
+    route = mock.post(URL).mock(return_value=_reply("ok"))
+    async with LLMClient(_settings(tmp_path)) as client:
+        await client.complete(MESSAGES, data_class=data_class)
+    assert route.call_count == 1
