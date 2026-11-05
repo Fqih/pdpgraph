@@ -65,7 +65,7 @@ class Review:
     verdict: str
 
 
-def read_reviews(text: str) -> dict[tuple[str, str], Review]:
+def read_reviews(text: str, verdicts: tuple[str, ...] = VERDICTS) -> dict[tuple[str, str], Review]:
     """Completed review lines, keyed by (section number, unit id)."""
     out: dict[tuple[str, str], Review] = {}
     section, unit = "", None
@@ -78,8 +78,8 @@ def read_reviews(text: str) -> dict[tuple[str, str], Review]:
             who, verdict = m.groups()
             if (who == PENDING) != (verdict == PENDING):
                 raise ReviewError(f"{unit}: set both reviewed_by and verdict, or neither")
-            if verdict != PENDING and verdict not in VERDICTS:
-                raise ReviewError(f"{unit}: verdict {verdict!r} not in {VERDICTS}")
+            if verdict != PENDING and verdict not in verdicts:
+                raise ReviewError(f"{unit}: verdict {verdict!r} not in {verdicts}")
             if who != PENDING:
                 out[section, unit] = Review(who, verdict)
     return out

@@ -124,7 +124,7 @@ def _context(text: str, start: int, end: int, marks: list[tuple[int, int]] | Non
     return "".join([*out, text[pos:hi]])
 
 
-def _stratified(
+def stratified(
     tags: list[tuple[str, ...]],
     order: tuple[str, ...],
     size: int,
@@ -206,7 +206,7 @@ def build_sample(
             )
         )
 
-    batch1 = _stratified([m.patterns for m in mentions], PATTERNS, first, per_type, rng)
+    batch1 = stratified([m.patterns for m in mentions], PATTERNS, first, per_type, rng)
     order = batch1 + [i for i in range(len(mentions)) if i not in batch1]
     for i in order:
         m, unit = mentions[i], by_id[mentions[i].unit_id]
@@ -226,7 +226,7 @@ def build_sample(
     tags = [tuple(dict.fromkeys(t[2] for t in free)) for *_, free in hits]
     present = tuple(t for t in TRIGGERS if any(t in ts for ts in tags))
     quota = math.ceil(targeted / len(present)) if present else 0
-    for i in _stratified(tags, present, targeted, quota, rng):
+    for i in stratified(tags, present, targeted, quota, rng):
         u, a, b, free = hits[i]
         add(
             kind="negative",
