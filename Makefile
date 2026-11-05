@@ -57,7 +57,7 @@ test-models: ## models-aux tests on real weights, offline (needs make models-dow
 up-llm: .env ## Compose core + local-llm (models-aux; llama.cpp T1 lands in M2.9)
 	MODELS_AUX_CACHE_DIR=$(MODELS_CACHE) $(COMPOSE) --profile core --profile local-llm up -d --build --wait --wait-timeout 600
 
-ingest: .env ## Ingest a source, e.g. make ingest SOURCE=uu27-2022 (stages so far: fetch..refs, crosscheck; needs make up)
+ingest: .env ## Ingest a source, e.g. make ingest SOURCE=uu27-2022 (stages so far: fetch..defs, crosscheck; needs make up)
 	@test -n "$(SOURCE)" || { echo "usage: make ingest SOURCE=<source_id>" >&2; exit 1; }
 	$(UV) python -m pdp_ingest --source $(SOURCE)
 

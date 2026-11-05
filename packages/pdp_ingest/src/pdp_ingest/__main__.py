@@ -8,6 +8,7 @@ from sqlalchemy import create_engine
 
 from common.db import PostgresSettings
 from pdp_ingest.db import register_source
+from pdp_ingest.defs_review import defs_markdown, read_defs_reviews
 from pdp_ingest.fetch import fetch_source
 from pdp_ingest.overrides import counts
 from pdp_ingest.pipeline import run_text_stages
@@ -15,7 +16,15 @@ from pdp_ingest.refs_review import refs_markdown
 from pdp_ingest.registry import load_source
 from pdp_ingest.review import read_reviews, review_markdown
 
-STAGES = ("fetch", "extract", "segment", "overrides", "refs", "crosscheck")  # extended by M1.4+
+STAGES = (
+    "fetch",
+    "extract",
+    "segment",
+    "overrides",
+    "refs",
+    "defs",
+    "crosscheck",
+)  # extended by M1.5+
 
 
 def main() -> None:
@@ -60,6 +69,28 @@ def main() -> None:
     )
     unresolved = sum(m.resolution == "UNRESOLVED" for m in result.mentions)
     print(f"refs: {len(result.mentions)} mentions, {unresolved} unresolved, list in {refs_list}")
+    defs_list = review.parent / "definitions.md"
+    defs_reviews = (
+        read_defs_reviews(defs_list.read_text(encoding="utf-8")) if defs_list.is_file() else {}
+    )
+    defs_list.write_text(
+        defs_markdown(
+            entry.source_id,
+            result.definitions,
+            result.term_uses,
+            result.categories,
+            result.units,
+            defs_reviews,
+            {f.unit_id: f.pdf_page for f in result.findings},
+        ),
+        encoding="utf-8",
+    )
+    edges = sum(u.kind == "defined" for u in result.term_uses)
+    print(
+        f"defs: {len(result.definitions)} definitions, {edges} USES_TERM links, "
+        f"{len(result.term_uses) - edges} informal, {len(result.categories)} data categories, "
+        f"list in {defs_list}"
+    )
 
     engine = create_engine(PostgresSettings().url())
     try:

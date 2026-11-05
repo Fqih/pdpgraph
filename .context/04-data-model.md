@@ -94,7 +94,7 @@ Rules:
 | `:Definition` | `node_id`, `term`, `term_norm`, `aliases[]`, `text` | From definitional articles |
 | `:Obligation` | `node_id`, `actor_role`, `action`, `object`, `condition`, `deadline`, `modality ∈ {WAJIB, DILARANG, DAPAT}`, `review_status ∈ {PENDING, APPROVED, REJECTED}` | Extracted; only `APPROVED` used online |
 | `:Actor` | `name ∈ {PENGENDALI, PROSESOR, SUBJEK_DATA, LEMBAGA, DPO, PIHAK_KETIGA, ...}` | Controlled vocabulary |
-| `:DataCategory` | `code ∈ {UMUM, SPESIFIK, KESEHATAN, BIOMETRIK, GENETIKA, CATATAN_KEJAHATAN, ANAK, KEUANGAN_PRIBADI, ...}` | [VERIFY list against Pasal 4] |
+| `:DataCategory` | `code`, `label`, `unit_id`, `parent_code`, `open`, `status ∈ {proposed, confirmed}` | Derived from Pasal 4 (§3.8): classes `SPESIFIK`, `UMUM`; members `KESEHATAN`, `BIOMETRIK`, `GENETIKA`, `CATATAN_KEJAHATAN`, `ANAK`, `KEUANGAN_PRIBADI`, `LAINNYA` (open) under `SPESIFIK`; `NAMA_LENGKAP`, `JENIS_KELAMIN`, `KEWARGANEGARAAN`, `AGAMA`, `STATUS_PERKAWINAN`, `DIKOMBINASIKAN_UNTUK_MENGIDENTIFIKASI_SESEORANG` under `UMUM`. All `proposed` until the owner confirms them |
 | `:Sanction` | `node_id`, `type ∈ {ADMINISTRATIVE, CRIMINAL}`, `description` | |
 | `:Concept` | `code` (e.g., `LEGAL_BASIS`, `CONSENT`, `BREACH_NOTIFICATION`, `CROSS_BORDER_TRANSFER`, `DPO`, `DPIA`, `RETENTION`) | Topic tags for routing gap analysis |
 
@@ -107,7 +107,7 @@ Rules:
 | `REFERENCES` | `LegalUnit` → `LegalUnit` | `mention_text`, `resolution ∈ {EXACT, PARENT, EXTERNAL_UNRESOLVED}` |
 | `EXPLAINED_BY` | `LegalUnit` → `LegalUnit{kind:PENJELASAN}` | |
 | `DEFINES` | `LegalUnit` → `Definition` | |
-| `USES_TERM` | `LegalUnit` → `Definition` | `count` |
+| `USES_TERM` | `LegalUnit` → `Definition` | `count` (defined uses only, §3.8) |
 | `SUPERSEDES` | newer `LegalUnit` → older `LegalUnit` | `effective_on`, `by_source_id` |
 | `MODIFIES_READING` | `Source{instrument_type: PUTUSAN_MK}` → `LegalUnit` | `effective_on`, `holding_summary`, `operative_text_quote` (verbatim, citable quote from the ruling), `status ∈ {CONDITIONALLY_UNCONSTITUTIONAL, UNCONSTITUTIONAL, OTHER}` (§3.5, ADR-017) |
 | `AMENDS` | `Source` (amending instrument) → `LegalUnit` | `effective_on`, `lampiran_ref`, `operative_text_quote` (verbatim, citable) (§3.6, ADR-019) |
@@ -172,6 +172,31 @@ The official text of a source is never overwritten. An amending instrument (e.g.
 | `unresolved` | Internal items without a unit |
 
 A mention is one chain of items joined by lists or ranges. Relative items take missing upper levels from the previous item, else from the context unit (the explained unit for a Penjelasan). `load_graph` (M1.5) creates one `REFERENCES {mention_text, resolution: EXACT}` edge per target of a `REFERENCES`-kind mention. `SELF` and `UNRESOLVED` items create no edge. `DELEGATION` creates no edge until the delegated instrument (PP 33/2026) is ingested. `PARENT` is not produced by the v1 resolver. The committed list of unresolved, external, delegation and self mentions is `data/review/<source_id>/refs.md`.
+
+### 3.8 Definitions, term uses and data categories (`defs` stage, M1.4)
+
+Artifacts in `data/processed/<source_id>/`:
+
+- `defs.jsonl`, one row per definition: `node_id` (`<source>/def/<slug>`, §2.1), `unit_id`, `term`, `term_norm`, `aliases` (from "yang selanjutnya disebut/disingkat"), and `text` (the whole definition item).
+- `term_uses.jsonl`, one row per unit, definition and kind:
+  - `kind`: `defined` (the term's own capitalization; becomes a `USES_TERM` edge) or `informal` (another capitalization; `confidence: low`, no edge);
+  - `count` and char `spans`.
+- `terms.json`: the sorted terms and aliases. This is the protected-terms list for the index (M1.6).
+- `data_categories.jsonl`: the candidate `:DataCategory` rows (§3.1) with `explanation` (the Penjelasan text, or null for "Cukup jelas").
+
+Matching rules:
+
+- Longest match first, and matches do not overlap.
+- An enclitic "-nya" is part of the match.
+- A defining unit never links its own term or aliases.
+- Text inside reference mentions is skipped, so the "Pemerintah" in "Peraturan Pemerintah" is not a use of the defined term.
+- An informal match may contain a defined one: "subjek Data Pribadi" is an informal use of Subjek Data Pribadi and a defined use of Data Pribadi.
+
+The owner's review list is `data/review/<source_id>/definitions.md`. Its `Review:` lines are kept on regeneration and record:
+- per definition: `ok`, `term_wrong` or `text_wrong`;
+- per category: `confirmed`, `code_change` or `not_a_category`.
+
+Only confirmed codes are used downstream.
 
 ## 4. Search index (OpenSearch)
 

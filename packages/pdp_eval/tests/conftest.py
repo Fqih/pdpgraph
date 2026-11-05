@@ -51,3 +51,23 @@ def law() -> LawText:
     return LawText(
         "uu27-2022", segment("uu27-2022", blocks(HTML), explanation_marker="PENJELASAN").units
     )
+
+
+# A small law with definitions and defined/informal term uses, for the term sample tests (M1.4).
+TERMS_HTML = (
+    "<p>BAB I</p><p>UMUM</p>"
+    "<p>Pasal 1</p><p>Dalam Undang-Undang ini yang dimaksud dengan:</p><ol>"
+    "<li><p>Data Pribadi adalah data tentang orang.</p></li>"
+    "<li><p>Subjek Data Pribadi adalah orang yang melekat Data Pribadi.</p></li>"
+    "<li><p>Korporasi adalah kumpulan orang.</p></li></ol>"
+    "<p>Pasal 2</p><p>Korporasi memproses Data Pribadi. Subjek Data Pribadi berhak.</p>"
+    "<p>Pasal 3</p><p>Setiap korporasi menjaga data pribadi milik subjek Data Pribadi.</p>"
+    "<p>PENJELASAN</p><p>I UMUM</p><p>Korporasi diatur.</p><p>II PASAL DEMI PASAL</p>"
+    "<p>Pasal 1</p><p>Cukup jelas.</p><p>Pasal 2</p><p>Cukup jelas.</p><p>Pasal 3</p>"
+    "<p>Cukup jelas.</p>"
+)
+
+
+@pytest.fixture
+def term_units() -> list[Unit]:
+    return segment("s", blocks(TERMS_HTML), explanation_marker="PENJELASAN").units

@@ -21,6 +21,7 @@ from pdp_eval.golden import VERDICTS, GoldenItem, composition, dump_items, load_
 from pdp_eval.law import LawText
 from pdp_eval.refs_cli import add_parsers as add_refs_parsers
 from pdp_eval.retest import LogEntry, agreement, append_log, eligible, log_path, read_log, sample
+from pdp_eval.terms_cli import add_parsers as add_terms_parsers
 
 Ask = Callable[[str], str]
 
@@ -267,6 +268,7 @@ def _parser() -> argparse.ArgumentParser:
     show.add_argument("pasal", help="Pasal number or 'umum'")
     show.set_defaults(fn=cmd_show)
     add_refs_parsers(sub)
+    add_terms_parsers(sub)
     return p
 
 

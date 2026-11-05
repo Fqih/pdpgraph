@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Text stages after `fetch` (03 §5.1, M1.2-M1.3): extract -> segment -> overrides -> refs,
-plus the PDF cross-check.
+"""Text stages after `fetch` (03 §5.1, M1.2-M1.4): extract -> segment -> overrides -> refs ->
+defs, plus the PDF cross-check.
 
 Artifacts under `data/processed/<source_id>/`:
 
@@ -8,10 +8,13 @@ Artifacts under `data/processed/<source_id>/`:
 - `segment.jsonl`: structures and units as segmented, before overrides;
 - `units.jsonl`: the units with `data/overrides/<source_id>.yaml` applied (input of later stages);
 - `refs.jsonl`: reference and delegation mentions with resolved targets (`refs.py`);
+- `defs.jsonl`, `term_uses.jsonl`, `terms.json`, `data_categories.jsonl`: definitions, defined and
+  informal term uses per unit, the protected-terms list (M1.6) and candidate data categories
+  (`defs.py`);
 - `crosscheck.jsonl`: one finding per unit against the reference PDF.
 
-The owner's review lists go to `data/review/<source_id>/`: `crosscheck.md` (`review.py`) and
-`refs.md` (`refs_review.py`).
+The owner's review lists go to `data/review/<source_id>/`: `crosscheck.md` (`review.py`),
+`refs.md` (`refs_review.py`) and `definitions.md` (`defs_review.py`).
 """
 
 import json
@@ -22,6 +25,16 @@ from typing import Any
 
 from pdp_ingest.canonical import Block, blocks
 from pdp_ingest.crosscheck import Finding, crosscheck, pdf_pages
+from pdp_ingest.defs import (
+    CLASSIFICATION_PASAL,
+    DataCategory,
+    Definition,
+    TermUse,
+    data_categories,
+    extract_definitions,
+    link_terms,
+    term_list,
+)
 from pdp_ingest.fetch import element_inner_html, load_verified
 from pdp_ingest.overrides import Override, apply_overrides, load_overrides
 from pdp_ingest.refs import Mention, extract_refs
@@ -38,6 +51,9 @@ class TextResult:
     findings: list[Finding]
     split_page: int  # first PDF page of the Penjelasan
     mentions: list[Mention] = field(default_factory=list)
+    definitions: list[Definition] = field(default_factory=list)
+    term_uses: list[TermUse] = field(default_factory=list)
+    categories: list[DataCategory] = field(default_factory=list)
 
 
 def _write_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
@@ -76,7 +92,22 @@ def run_text_stages(
     _, pdf_path = load_verified(entry, raw_dir)
     ref, findings = crosscheck(units, pdf_pages(pdf_path))
     mentions = extract_refs(units)
-    result = TextResult(extracted, segmented, overrides, units, findings, ref.split_page, mentions)
+    definitions = extract_definitions(units)
+    uses = link_terms(units, definitions, mentions)
+    pasal = CLASSIFICATION_PASAL.get(entry.source_id)
+    categories = data_categories(units, pasal=pasal) if pasal else []
+    result = TextResult(
+        extracted,
+        segmented,
+        overrides,
+        units,
+        findings,
+        ref.split_page,
+        mentions,
+        definitions,
+        uses,
+        categories,
+    )
     if processed_dir is not None:
         out = processed_dir / entry.source_id
         _write_jsonl(
@@ -93,5 +124,16 @@ def run_text_stages(
         )
         _write_jsonl(out / "units.jsonl", (asdict(u) for u in units))
         _write_jsonl(out / "refs.jsonl", (asdict(m) for m in mentions))
+        _write_jsonl(
+            out / "defs.jsonl", (asdict(d) | {"term_norm": d.term_norm} for d in definitions)
+        )
+        _write_jsonl(
+            out / "term_uses.jsonl", (asdict(u) | {"confidence": u.confidence} for u in uses)
+        )
+        (out / "terms.json").write_text(
+            json.dumps(term_list(definitions), ensure_ascii=False, indent=1) + "\n",
+            encoding="utf-8",
+        )
+        _write_jsonl(out / "data_categories.jsonl", (asdict(c) for c in categories))
         _write_jsonl(out / "crosscheck.jsonl", (asdict(f) for f in findings))
     return result
