@@ -10,12 +10,14 @@ max_chars: 8000
 models:
   embed:
     repo: BAAI/bge-m3
-    revision: 5617a9f61b028005a4858fdac845db406aefb181
+    # Last official BAAI commit on main that ships model.safetensors (later commits deleted it
+    # without a stated reason). Tensors verified bit-identical to pytorch_model.bin at
+    # 5617a9f6 (391 fp32 tensors); config and tokenizer files are identical (SEC-13).
+    revision: 7b44caba5c06fd6f1ef1d2786261e636c38e4295
     license: MIT
     # Dense vectors only (CLS pooling, L2-normalized); sparse/ColBERT heads are not used.
     max_length: 512 # [TUNE] tokens; longer inputs are truncated
-    # Only a pickle checkpoint exists at this revision; transformers loads it weights_only.
-    allow_patterns: [config.json, pytorch_model.bin, tokenizer.json, tokenizer_config.json, special_tokens_map.json, sentencepiece.bpe.model]
+    allow_patterns: [config.json, model.safetensors, tokenizer.json, tokenizer_config.json, special_tokens_map.json, sentencepiece.bpe.model]
   rerank:
     repo: BAAI/bge-reranker-v2-m3
     revision: 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e
