@@ -2,8 +2,8 @@
 # Compose stack (03 §7). Run via the Makefile so `.env` at the repo root is used:
 #   docker compose --project-directory . -f deploy/compose/compose.yaml --profile core up -d
 #
-# Profile `core` = stores only (M0.2). App, local-llm, mock, and obs services are added by the
-# tasks that need them. Store ports are published on 127.0.0.1 only (SEC-15); containers run
+# Profile `core` = stores only (M0.2); `local-llm` = models-aux (M0.4; llama.cpp T1 in M2.9).
+# App, mock, and obs services are added by the tasks that need them. Store ports are published on 127.0.0.1 only (SEC-15); containers run
 # as non-root with no extra privileges. Memory limits follow the 16 GB budget in 03 §7 [TUNE].
 # Images are pinned by tag and digest (SEC-13).
 
@@ -107,6 +107,26 @@ services:
       interval: 5s
       timeout: 5s
       retries: 12
+
+  models-aux:
+    <<: *hardening
+    profiles: [local-llm]
+    build:
+      context: .
+      dockerfile: deploy/docker/models-aux.Dockerfile
+    image: pdpgraph/models-aux:dev
+    ports:
+      - "127.0.0.1:8070:8070"
+    volumes:
+      # Pinned weights from `make models-download`, outside the repo; read-only.
+      - ${MODELS_AUX_CACHE_DIR:-${HOME}/.cache/pdpgraph/models}:/models:ro
+    mem_limit: 8g # [TUNE] see progress.md measured RSS
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8070/healthz', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 300s
 
 volumes:
   neo4j-data:

@@ -7,7 +7,7 @@ Claude Code updates this file at the end of every session. Newest entry on top o
 | Field | Value |
 |---|---|
 | Phase | 0 — Foundations |
-| Current task | M0.4 next (M0.7 blocked; awaiting go-ahead) |
+| Current task | Phase 0 done except M0.7 (blocked); awaiting go-ahead |
 | Last updated | 2026-11-05 |
 | Release | none |
 
@@ -18,7 +18,7 @@ Claude Code updates this file at the end of every session. Newest entry on top o
 | M0.1 | done (PR #1) | uv workspace, 8 packages, ruff/mypy/pytest, pre-commit, CI green |
 | M0.2 | done (PR #5) | compose `core`: 4 stores, healthchecks, mem limits, loopback ports, non-root, digests pinned; CI integration job |
 | M0.3 | done (PR #3) | config, logging + redaction, telemetry, ids, pii; 142 tests; `make cov` gate |
-| M0.4 | todo | fp32 CPU baseline first; int8/ONNX only as measured optimization with eval delta |
+| M0.4 | done (PR #11) | models-aux fp32 CPU: `/embed`, `/rerank`, `/nli`, dynamic batching; pinned revisions in `configs/models_aux.yaml`; compose `local-llm`; offline runtime |
 | M0.5 | done (PR #8) | `common/llm/`: async `LLMClient`, cassettes (replay/record/live), `UsageLimiter`, one span per call |
 | M0.6 | done (PR #6) | Alembic `0001_initial` = 04 §6 SQL verbatim; `make migrate` idempotent; upgrade/downgrade/re-upgrade tested |
 | M0.7 | blocked (billing class per 9router provider prefix pending from owner) | 9router alignment (ADR-016); tracked here only, not in 08-roadmap; does not block other tasks |
@@ -44,6 +44,11 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 | 2026-11-05 | Idle store memory after start (M0.2) | neo4j 1.40 GiB, opensearch 1.40 GiB, postgres 22 MiB, valkey 3.9 MiB | `docker stats --no-stream` |
 | 2026-11-05 | Branch coverage, `common` (M0.3) | 98.89% (271 stmts, 88 branches) | `make cov` |
 | 2026-11-05 | Branch coverage, `common` (M0.5) | 99.04% (572 stmts, 156 branches) | `make cov` |
+| 2026-11-05 | models-aux load time per model, fp32, warm OS page cache (cpu-local: Ryzen 7 PRO 4750U 8C/16T, torch 8 threads, 21 GB RAM, Fedora 43, Docker 29.9.1) | bge-m3 6.96 s, bge-reranker-v2-m3 3.61 s, mDeBERTa NLI 3.53 s | service log `model_loaded` after `make up-llm` |
+| 2026-11-05 | `make up-llm` from stopped stack to all 5 services healthy (cpu-local: Ryzen 7 PRO 4750U 8C/16T, torch 8 threads, 21 GB RAM, Fedora 43, Docker 29.9.1) | 27.7 s | `time make up-llm` |
+| 2026-11-05 | models-aux process RSS after load / after benchmark, all 3 models (cpu-local: Ryzen 7 PRO 4750U 8C/16T, torch 8 threads, 21 GB RAM, Fedora 43, Docker 29.9.1) | 4.67 GiB (2.31 GiB anon + 2.36 GiB file-backed mmap); high-water 4.73 GiB. `docker stats` shows only 2.23–2.34 GiB because it excludes file pages | `/proc/1/status` in container; `docker stats` |
+| 2026-11-05 | models-aux latency, sequential, 30 runs after 3 warm-up, HTTP via compose; passages 51 tokens avg, query 13 (cpu-local: Ryzen 7 PRO 4750U 8C/16T, torch 8 threads, 21 GB RAM, Fedora 43, Docker 29.9.1) | `/embed` 1 query p50 328.8 / p95 392.8 ms; `/embed` 32 passages p50 5797.5 / p95 6570.3 ms; `/rerank` 1×30 p50 6993.3 / p95 7825.8 ms; `/nli` 8 pairs p50 1034.2 / p95 1425.5 ms | `scripts/bench_models_aux.py --runs 30` |
+| 2026-11-05 | Core stores next to models-aux (same run) | neo4j 1.49 GiB, opensearch 1.38 GiB, postgres 20 MiB, valkey 7 MiB; host 8.3 GB available with desktop apps running | `docker stats`, `free -m` |
 
 ## Follow-ups discovered
 
@@ -58,6 +63,10 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 - **M1.6 plan (owner):** multi-field index: `text` = standard tokenizer + lowercase, no stemming; `text.stem` = `indonesian`; optional `text.shingle` for phrases. Query all with boosts tuned on the dev split only. Protect legal terms from the stemmer with a `keyword_marker` filter whose term list is generated from the graph's Definition nodes plus actor names (pengendali, prosesor, subjek data, ...). Measure each choice as a retrieval-recall ablation: no-stem vs stem vs multi-field vs multi-field + protected terms.
 - **M2.11 plan (owner), extend `common/pii.py`:** structural NIK validation (province/regency code shape; birth date with the +40 day offset for women), which then makes it safe to detect space- and dash-separated NIK formats; labeled KK (Kartu Keluarga) and passport numbers; tests for each new pattern plus the existing hex/UUID property test. Names and addresses stay out of scope for deterministic detection (documented known limitation).
 - M0.5 `LLMClient` limits: (1) closed in PR #10: `confidential`/`pii` are refused unless the `base_url` host is in `local_base_urls` (default 127.0.0.1, ::1, localhost); replay is exempt because it sends nothing. The M0.7 catalog and Tierline policy (M2) tighten this further; never relax it. (2) The token cap stops the *next* call, so the total can overshoot by the calls in flight. (3) `complete_json` sends `strict: true`; whether each upstream accepts pydantic-generated schemas is checked by the M0.7 probe. (4) The cassette writer applies the logging sanitizer, so a recorded body can differ from the live one if it contained secret-shaped text; PII and configured secrets are refused outright. (5) A replayed call reports the recorded latency.
+- **M0.4 memory vs 03 §7 budget:** models-aux RSS is 4.67 GiB against the 2–3 GB line in 03 §7 (owner to decide; not changed). Stack now ≈ 7.6 GiB (stores ≈ 2.9 GiB + models-aux); llama.cpp T1 (M2.9, 2–4 GB) would bring it to ≈ 10–12 GiB. Options for later, each a measured change with an eval delta: int8/ONNX, or dropping the separate reranker. `mem_limit: 8g` is [TUNE].
+- **M0.4 latency:** `/rerank` 1×30 ≈ 7 s p50 and `/embed` 32 passages ≈ 5.8 s p50 on CPU; per-sub-question rerank cost dominates the online path (M1 planning). Ingest-time embedding of the corpus is a one-off batch.
+- **M0.4:** bge-m3 at the pinned revision ships only `pytorch_model.bin` (pickle); transformers 5 loads it `weights_only` (torch 2.15). The other two use safetensors.
+- **M0.4:** real-weights tests (`make test-models`, marker `models`) are not run in CI: they need the 4.9 GB weights. CI runs the 30 fake-model unit tests. Load times are with a warm page cache; a cold read is slower (not measured; would need dropping caches).
 - **M1.16:** reservation-based `UsageLimiter` for concurrent runs: reserve estimated prompt tokens + `max_tokens` before each call, reconcile with actual usage after.
 - Cassette entries get `sanitized: true` when redaction changed any content.
 - **M0.7:** `complete_json` sends `strict: true` only when the model's catalog capability flag says it is supported; no silent fallback.
@@ -89,10 +98,16 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 | 2026-11-05 | Merge with the GitHub squash button; no local squash or force-push workflows | 09 §4 |
 | 2026-11-05 | Labeled PII patterns added so `NIK3171…`-style glued values are caught | FR-GW-17 |
 | 2026-11-05 | M0.7 probe hard caps: abort at 200 calls or 200,000 total tokens, whichever first | M0.7 |
+| 2026-11-05 | models-aux: fp32, transformers only (no sentence-transformers), torch from the CPU index; weights in `~/.cache/pdpgraph/models` via `make models-download`; runtime `HF_HUB_OFFLINE=1` enforced at start + `local_files_only`; rerank score = sigmoid(logit); bge-m3 dense = CLS, L2-normalized; max_length 512 | M0.4 |
 | 2026-11-05 | `LLMClient` fails closed: `confidential`/`pii` only to hosts in `local_base_urls` (record/live); never relax | ADR-013, ADR-015 |
 | 2026-11-05 | `LLMClient` is async (httpx), `LLM_*` settings, mode defaults to `replay`; cassette key = SHA-256 of canonical request incl. attempt; secrets checked before PII; `make eval-record` stub until M1.16 | M0.5, NFR-06, NFR-12 |
 
 ## Session log
+
+### 2026-11-05 — M0.4 models-aux, plus M0.5 follow-ups
+- PR #9: spec-drift message now starts "04 §6 changed: write a new migration revision"; follow-ups logged. PR #10: `LLMClient` local-only guard for `confidential`/`pii`.
+- M0.4: `models_aux` (`settings`, `batching`, `models`, `app`, `download`, `__main__`), `configs/models_aux.yaml`, `deploy/docker/models-aux.Dockerfile`, compose `local-llm`, `make models-download` / `test-models` / `up-llm`, `scripts/bench_models_aux.py`. Shared `no_network` fixture moved to the repo-root `conftest.py`.
+- Tests first: 30 unit tests on fake models (RED on import, then GREEN); 4 real-weights tests offline with the socket guard pass.
 
 ### 2026-11-05 — M0.5 LLM client
 - `common/llm/` (`client.py`, `cassette.py`, `limiter.py`, `settings.py`, `errors.py`), `evals/cassettes/`, `make eval-record` stub; dev deps `respx`, `pytest-asyncio`.

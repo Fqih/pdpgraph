@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help sync lint fmt check test cov migrate test-int eval-smoke eval-record up down up-llm up-mock up-obs ingest
+.PHONY: help sync lint fmt check test cov migrate test-int eval-smoke eval-record up down up-llm up-mock up-obs ingest models-download test-models
 
 UV := uv run --frozen
 COMPOSE := docker compose --project-directory . -f deploy/compose/compose.yaml
@@ -43,9 +43,18 @@ migrate: .env ## Apply Postgres migrations (idempotent; needs `make up`)
 .env:
 	@echo "Missing .env: cp .env.example .env and set local passwords" >&2; exit 1
 
+MODELS_CACHE ?= $(HOME)/.cache/pdpgraph/models
+
+models-download: ## Download pinned models-aux weights into $(MODELS_CACHE), outside the repo
+	MODELS_AUX_CACHE_DIR=$(MODELS_CACHE) $(UV) python -m models_aux.download
+
+test-models: ## models-aux tests on real weights, offline (needs make models-download)
+	HF_HUB_OFFLINE=1 MODELS_AUX_CACHE_DIR=$(MODELS_CACHE) $(UV) pytest -m models
+
+up-llm: .env ## Compose core + local-llm (models-aux; llama.cpp T1 lands in M2.9)
+	MODELS_AUX_CACHE_DIR=$(MODELS_CACHE) $(COMPOSE) --profile core --profile local-llm up -d --build --wait --wait-timeout 600
+
 # Targets below land in later roadmap tasks; they fail loudly until then.
-up-llm: ## Compose local-llm profile (M0.4)
-	@echo "make $@: lands in M0.4" >&2; exit 1
 
 up-mock up-obs: ## Compose profiles (M2.9)
 	@echo "make $@: lands in M2.9" >&2; exit 1

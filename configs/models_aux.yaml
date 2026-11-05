@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: Apache-2.0
+# models-aux (M0.4): fp32 CPU baseline. Revisions are Hugging Face commit hashes; changing a
+# model, revision, dtype, or max_length needs an eval delta (06). int8/ONNX only as a later,
+# measured optimization. Licences as declared on each model card (checked 2026-11-05).
+torch_threads: 8 # [TUNE] physical cores on cpu-local
+max_batch: 32 # [TUNE]
+max_wait_ms: 5 # [TUNE]
+max_inputs: 64
+max_chars: 8000
+models:
+  embed:
+    repo: BAAI/bge-m3
+    revision: 5617a9f61b028005a4858fdac845db406aefb181
+    license: MIT
+    # Dense vectors only (CLS pooling, L2-normalized); sparse/ColBERT heads are not used.
+    max_length: 512 # [TUNE] tokens; longer inputs are truncated
+    # Only a pickle checkpoint exists at this revision; transformers loads it weights_only.
+    allow_patterns: [config.json, pytorch_model.bin, tokenizer.json, tokenizer_config.json, special_tokens_map.json, sentencepiece.bpe.model]
+  rerank:
+    repo: BAAI/bge-reranker-v2-m3
+    revision: 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e
+    license: Apache-2.0
+    max_length: 512 # [TUNE]
+    allow_patterns: [config.json, model.safetensors, tokenizer.json, tokenizer_config.json, special_tokens_map.json, sentencepiece.bpe.model]
+  nli:
+    repo: MoritzLaurer/mDeBERTa-v3-base-xnli-multilingual-nli-2mil7
+    revision: b5113eb38ab63efdd7f280f8c144ea8b13f978ce
+    license: MIT
+    max_length: 512 # [TUNE]
+    allow_patterns: [config.json, model.safetensors, tokenizer.json, tokenizer_config.json, special_tokens_map.json, added_tokens.json, spm.model]
