@@ -1,12 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
 """Reference-sample commands for the labeling CLI (M1.3, 06 §2.9).
 
-- `refs-sample`: build the stratified sample from the current resolver output (once; refuses to
+- `refs-sample`: build the item set from the current resolver output: every mention (a
+  stratified first batch, then the rest) plus targeted and random negatives (once; refuses to
   overwrite an existing file);
 - `refs-label`: show each mention in context with the proposed targets; the annotator marks
   correct / wrong (with the right targets) / not a reference, or for a negative sentence
   no reference / missed (with the missed targets);
-- `refs-report`: precision and recall per pattern type of the current resolver on the labels.
+- `refs-report`: precision and recall of the current resolver on the labels, overall (each item
+  once), per overlapping pattern slice and per negative batch, with Wilson 95% intervals.
 
 Targets are unit ids (the source prefix may be left out, e.g. `p20/a2`) or SELF, EXTERNAL,
 DELEGATION. A "wrong" answer is either the full target list or `+id` / `-id` edits of the
@@ -24,11 +26,14 @@ from typing import TYPE_CHECKING
 from pdp_eval.refsample import (
     PATTERNS,
     PSEUDO_TARGETS,
+    TRIGGERS,
     RefItem,
     build_sample,
     dump_ref_items,
     load_ref_items,
+    negative_pools,
     score,
+    wilson,
 )
 from pdp_ingest.refs import extract_refs
 
@@ -46,18 +51,27 @@ def cmd_refs_sample(args: argparse.Namespace, s: "Session", _: Callable[[], date
     items = build_sample(
         s.law.units,
         mentions,
-        size=args.size,
+        first=args.first,
         per_type=args.per_type,
-        negatives=args.negatives,
+        targeted=args.targeted,
+        random_negatives=args.random_negatives,
         seed=args.seed,
     )
     dump_ref_items(args.file, items)
     population = Counter(p for m in mentions for p in m.patterns)
-    sampled = Counter(p for i in items for p in i.patterns)
+    first = Counter(p for i in items if i.batch == "stratified" for p in i.patterns)
+    batches = Counter(i.batch for i in items)
     s.say(f"wrote {len(items)} items to {args.file} (seed {args.seed})")
+    s.say(f"mentions: {batches['stratified']} in the first batch, {batches['rest']} after")
     for p in PATTERNS:
-        s.say(f"  {p}: {sampled[p]} of {population[p]}")
-    s.say(f"  negatives: {sum(i.kind == 'negative' for i in items)}")
+        s.say(f"  {p}: {first[p]} of {population[p]} in the first batch")
+    targeted = [i for i in items if i.batch == "targeted"]
+    triggers = Counter(t for i in targeted for t in i.patterns)
+    s.say(
+        f"targeted negatives: {len(targeted)} of {len(negative_pools(s.law.units, mentions)[0])} "
+        "candidates (" + ", ".join(f"{t} {triggers[t]}" for t in TRIGGERS if triggers[t]) + ")"
+    )
+    s.say(f"random negatives: {batches['random']}")
     return 0
 
 
@@ -89,14 +103,16 @@ def _targets(s: "Session", item: RefItem, prompt: str) -> list[str]:
 
 
 def _label_one(s: "Session", item: RefItem, annotator: str) -> RefItem | None:
-    tags = ", ".join(item.patterns) or "no mention found"
-    s.say(f"\n== {item.item_id}  [{item.kind}; {tags}]  {item.label} ({item.unit_id})")
+    tags = ", ".join(item.patterns) or "no trigger"
+    s.say(f"\n== {item.item_id}  [{item.batch} {item.kind}; {tags}]  {item.label} ({item.unit_id})")
     s.say(item.context)
     if item.kind == "mention":
         s.say("proposed: " + " ".join(item.proposed))
         answer = s.ask("c=correct, w=wrong targets, n=not a reference, empty=skip: ")
         verdicts = {"c": "correct", "w": "wrong", "n": "not_reference"}
     else:
+        if item.triggers:
+            s.say("no mention found at the [[marked]] words")
         answer = s.ask("n=no reference, m=missed reference(s), empty=skip: ")
         verdicts = {"n": "no_reference", "m": "missed"}
     if answer not in verdicts:
@@ -140,8 +156,12 @@ def cmd_refs_label(args: argparse.Namespace, s: "Session", _: Callable[[], datet
     return 0
 
 
-def _pct(value: object) -> str:
-    return "-" if value is None else f"{100 * float(value):.1f}%"  # type: ignore[arg-type]
+def _rate(k: int, n: int) -> str:
+    interval = wilson(k, n)
+    if interval is None:
+        return "-"
+    lo, hi = interval
+    return f"{100 * k / n:.1f}% [{100 * lo:.1f}-{100 * hi:.1f}]"
 
 
 def _git_sha() -> str:
@@ -170,15 +190,26 @@ def cmd_refs_report(args: argparse.Namespace, s: "Session", _: Callable[[], date
         "",
         f"Targets: {TARGETS}.",
         "",
+        "`overall` counts each item once (the headline); `mentions` each mention once; the "
+        "pattern rows are overlapping slices (a mention can be both `sebagaimana` and "
+        "`relative`). Precision and recall are target-level with Wilson 95% intervals, which "
+        "treat targets as independent; `Exact` is the share of items whose targets all match.",
+        "",
         "| Row | Items | Exact | TP | FP | FN | Precision | Recall |",
         "|---|---|---|---|---|---|---|---|",
     ]
-    for key in ("overall", *PATTERNS, "negatives"):
+    order = ("overall", "mentions", *PATTERNS, "negatives:targeted", "negatives:random")
+    for key in order:
         if key in rows:
-            r = rows[key]
+            r = {
+                k: int(v or 0)
+                for k, v in rows[key].items()
+                if k in ("items", "exact", "tp", "fp", "fn")
+            }
             lines.append(
-                f"| {key} | {r['items']} | {r['exact']} | {r['tp']} | {r['fp']} | {r['fn']} | "
-                f"{_pct(r['precision'])} | {_pct(r['recall'])} |"
+                f"| {key} | {r['items']} | {_rate(r['exact'], r['items'])} | {r['tp']} | "
+                f"{r['fp']} | {r['fn']} | {_rate(r['tp'], r['tp'] + r['fp'])} | "
+                f"{_rate(r['tp'], r['tp'] + r['fn'])} |"
             )
     text = "\n".join(lines) + "\n"
     s.say(text)
@@ -194,9 +225,10 @@ def add_parsers(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> N
     default = Path("evals/datasets/pdp-refs/v0/sample.jsonl")
     sample = sub.add_parser("refs-sample")
     sample.add_argument("--file", type=Path, default=default)
-    sample.add_argument("--size", type=int, default=50)
+    sample.add_argument("--first", type=int, default=50, help="stratified first batch")
     sample.add_argument("--per-type", type=int, default=5)
-    sample.add_argument("--negatives", type=int, default=20)
+    sample.add_argument("--targeted", type=int, default=40)
+    sample.add_argument("--random-negatives", type=int, default=10)
     sample.add_argument("--seed", type=int, default=20261105)
     sample.set_defaults(fn=cmd_refs_sample)
     label = sub.add_parser("refs-label")

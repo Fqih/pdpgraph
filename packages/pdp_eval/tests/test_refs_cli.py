@@ -30,15 +30,31 @@ def _run(argv: list[str], answers: list[str], law: LawText) -> tuple[int, str, l
     return main(argv, ask=ask, out=out, law=law), out.getvalue(), prompts
 
 
-SAMPLE = ["--size", "4", "--per-type", "1", "--negatives", "2", "--seed", "7"]
+SAMPLE = [
+    "--first",
+    "4",
+    "--per-type",
+    "1",
+    "--targeted",
+    "1",
+    "--random-negatives",
+    "1",
+    "--seed",
+    "7",
+]
 
 
 def test_sample_is_written_once(tmp_path: Path, law: LawText) -> None:
     path = tmp_path / "pdp-refs" / "v0" / "sample.jsonl"
     code, out, _ = _run(["refs-sample", "--file", str(path), *SAMPLE], [], law)
     assert code == 0
-    assert [i.kind for i in load_ref_items(path)] == ["mention"] * 4 + ["negative"] * 2
-    assert "range: 1 of 1" in out
+    assert [i.batch for i in load_ref_items(path)] == ["stratified"] * 4 + [
+        "rest",
+        "targeted",
+        "random",
+    ]
+    assert "range: 1 of 1 in the first batch" in out
+    assert "targeted negatives: 1 of 2 candidates" in out
     code, out, _ = _run(["refs-sample", "--file", str(path), *SAMPLE], [], law)
     assert code == 1
     assert "exists" in out
@@ -58,11 +74,13 @@ def test_label_then_report(tmp_path: Path, law: LawText) -> None:
         "",  # r-0003 delegation marked not a reference
         "c",
         "ok",  # r-0004 range
-        "n",
-        "",  # r-0005 negative
+        "c",
+        "",  # r-0005 (rest batch)
         "m",
-        "p3",
-        "",  # r-0006 negative with a missed reference
+        "external",
+        "",  # r-0006 targeted negative: missed generic reference
+        "n",
+        "",  # r-0007 random negative
     ]
     code, out, _ = _run(["refs-label", "--file", str(path)], answers, law)
     assert code == 0
@@ -75,16 +93,22 @@ def test_label_then_report(tmp_path: Path, law: LawText) -> None:
     assert items["r-0002"].gold_targets == ["s/p2/a1", "s/p2/a2"]
     assert (items["r-0003"].verdict, items["r-0003"].gold_targets) == ("not_reference", [])
     assert items["r-0004"].notes == "ok"
-    assert (items["r-0006"].verdict, items["r-0006"].gold_targets) == ("missed", ["s/p3"])
+    assert (items["r-0006"].verdict, items["r-0006"].gold_targets) == ("missed", ["EXTERNAL"])
+    assert "[[ketentuan]] [[peraturan]]" in out
     assert all(i.annotator == "faqih" for i in items.values())
 
     report = tmp_path / "report.md"
     code, out, _ = _run(["refs-report", "--file", str(path), "--out", str(report)], [], law)
     assert code == 0
     text = report.read_text(encoding="utf-8")
-    assert "Labeled: 6 of 6" in text
-    assert "| overall | 6 | 3 | 4 | 1 | 2 | 80.0% | 66.7% |" in text
-    assert "| negatives | 2 | 1 | 0 | 0 | 1 | - | 0.0% |" in text
+    assert "Labeled: 7 of 7" in text
+    assert (
+        "| overall | 7 | 57.1% [25.0-84.2] | 5 | 1 | 2 | 83.3% [43.6-97.0] | 71.4% [35.9-91.8] |"
+        in text
+    )
+    assert "| mentions | 5 |" in text
+    assert "| negatives:targeted | 1 | 0.0% [0.0-79.3] | 0 | 0 | 1 | - | 0.0% [0.0-79.3] |" in text
+    assert "overlapping slices" in text
     assert "[TARGET]" in text
 
 
