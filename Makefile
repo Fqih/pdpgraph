@@ -49,7 +49,7 @@ models-download: ## Download pinned models-aux weights into $(MODELS_CACHE), out
 	MODELS_AUX_CACHE_DIR=$(MODELS_CACHE) $(UV) python -m models_aux.download
 
 test-snapshot: ## Ingestion checks on the real sources (needs make ingest)
-	$(UV) pytest -m snapshot -s packages/pdp_ingest
+	$(UV) pytest -m snapshot -s packages/pdp_ingest packages/pdp_eval
 
 test-models: ## models-aux tests on real weights, offline (needs make models-download)
 	HF_HUB_OFFLINE=1 MODELS_AUX_CACHE_DIR=$(MODELS_CACHE) $(UV) pytest -m models

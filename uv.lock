@@ -11,6 +11,7 @@ members = [
     "models-aux",
     "pdp-api",
     "pdp-core",
+    "pdp-eval",
     "pdp-ingest",
     "pdp-mcp",
     "pdpgraph-common",
@@ -808,6 +809,23 @@ source = { editable = "packages/pdp_api" }
 name = "pdp-core"
 version = "0.0.0"
 source = { editable = "packages/pdp_core" }
+
+[[package]]
+name = "pdp-eval"
+version = "0.0.0"
+source = { editable = "packages/pdp_eval" }
+dependencies = [
+    { name = "pdp-ingest" },
+    { name = "pdpgraph-common" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pdp-ingest", editable = "packages/pdp_ingest" },
+    { name = "pdpgraph-common", editable = "packages/common" },
+    { name = "pydantic", specifier = ">=2.14.2,<3" },
+]
 
 [[package]]
 name = "pdp-ingest"
