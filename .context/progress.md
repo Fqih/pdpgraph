@@ -47,10 +47,9 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 - ruff 0.17 formats code blocks inside Markdown by default; ruff config and pre-commit hooks are limited to `.py`/`.pyi` so tooling never rewrites `.context/`.
 - Global `core.hooksPath` on the dev machine points elsewhere, so `pre-commit install` refuses; it stays untouched. Run `make check` before every commit; CI runs the same hooks plus a full-history gitleaks scan.
 - 04 §2.1 grammar is implemented exactly as written (owner-approved): it also accepts `#pj` on Bab/def/obl/`pj-umum` and huruf/angka directly under a Pasal. Tighten only via a spec change.
-- PII patterns (`common/pii.py`) are [TUNE] and favour recall: any standalone 15-digit run (NPWP) and Luhn-valid 13–19 digit run (card) match, so long numeric IDs can trigger escalation. Mobile numbers only; landlines are not detected. Digit values must not touch a letter or digit (so hex IDs, hashes, and UUIDs never match — a CI run caught a trace ID being redacted as NPWP); a value glued to letters such as `NIK3171…` is missed. Measure the escalation rate on the golden set (ADR-015).
+- PII patterns (`common/pii.py`) are [TUNE] and favour recall. Two rules: (1) unlabeled digit runs must not touch a letter or digit, so hex IDs, hashes, and UUIDs never match (a CI run had caught a trace ID redacted as NPWP); (2) labeled values (`NIK`, `KTP`, `No. KTP`, `nomor induk kependudukan`, `NPWP`, any case, optional space/colon/dash/dot) match even when glued to letters. **Known limitations (for README):** an unlabeled NIK/NPWP glued to letters (e.g. `abc3171…`) is missed; NIK written with internal spaces is missed unless it also passes the card Luhn check; no structural NIK validation; only mobile numbers (no landlines); no detection of names, addresses, KK/passport numbers, or other free-text PII. Any standalone 15-digit run or Luhn-valid 13–19 digit run escalates (false positives cost latency only). Measure the escalation rate on the golden set (ADR-015).
 - `.env` entries that are not fields of a settings class are ignored (one `.env` serves all services); YAML keys stay strict.
-- 07 §4.1 mentions tracing "decorators": none were added, because OTel's `tracer.start_as_current_span` already works as a decorator for sync and async functions. Owner to confirm whether 07 should say so.
-- Merges: GitHub merge buttons record the profile name as committer, so PRs are merged by fast-forwarding `main` locally after green CI (author and committer stay `Fqih`). `00260f2` has committer `FaqihHakim` from a rebase-merge; left as is.
+- Merges use the GitHub squash-merge button (owner decision); the recorded author/committer name is accepted as is. PR #3 was squash-merged locally (`8f03aa0`) and shows as closed.
 - Commit `9df2b74` on `main` has author name `FaqihHakim` (GitHub squash merge used the profile display name). Accepted as is by the owner; no history rewrite. Later PRs are squashed to one commit locally and merged with `--rebase`, which keeps the author `Fqih` and still lands one commit per PR.
 
 ## Decisions log
@@ -74,6 +73,8 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 | 2026-11-05 | Shared deterministic PII patterns in `common/pii.py` (LLMClient cassette guard + Tierline scanner) | FR-GW-17, M0.5 |
 | 2026-11-05 | Within-tier alternates deferred to ADR-017 in M2.2 | FR-GW-02, FR-GW-09 |
 | 2026-11-05 | Code Apache-2.0 (SPDX header per file); own datasets CC BY 4.0; statute text cited to official source | 09 §2, README |
+| 2026-11-05 | Merge with the GitHub squash button; no local squash or force-push workflows | 09 §4 |
+| 2026-11-05 | Labeled PII patterns added so `NIK3171…`-style glued values are caught | FR-GW-17 |
 | 2026-11-05 | M0.7 probe hard caps: abort at 200 calls or 200,000 total tokens, whichever first | M0.7 |
 
 ## Session log
