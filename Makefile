@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help sync lint fmt test test-int eval-smoke up down up-llm up-mock up-obs ingest
+.PHONY: help sync lint fmt check test test-int eval-smoke up down up-llm up-mock up-obs ingest
 
 UV := uv run --frozen
 
@@ -17,6 +17,9 @@ lint: ## ruff (lint + format check) + mypy
 fmt: ## Apply ruff fixes and formatting
 	$(UV) ruff check --fix .
 	$(UV) ruff format .
+
+check: ## All pre-commit hooks on all files (run before every commit; CI enforces)
+	$(UV) pre-commit run --all-files
 
 test: ## Unit + property + contract tests
 	$(UV) pytest

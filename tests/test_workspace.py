@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Workspace smoke test: every package from 03-architecture §8 imports and ships py.typed (M0.1)."""
 
 import importlib

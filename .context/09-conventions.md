@@ -11,6 +11,7 @@
 
 - Python 3.12; `uv` for env, deps, workspace, and running (`uv run …`). No `pip install` in docs or scripts.
 - Lint/format: `ruff` (lint + format), line length 100.
+- ruff runs on `.py`/`.pyi` only; it must never format Markdown (it would rewrite code blocks in `.context/`).
 - Types: `mypy --strict` for `pdp_core`, `tierline`, `common`; regular mode elsewhere. No `Any` in public signatures.
 - Tests: `pytest`, `pytest-asyncio`, `hypothesis` (property tests), `respx` (httpx mocking), `testcontainers` only for integration markers.
 - Pre-commit: ruff, ruff-format, mypy (changed files), gitleaks, end-of-file/trailing-whitespace.
@@ -25,6 +26,7 @@
 - Errors: domain exceptions in `<pkg>/errors.py`, mapped to API error envelope in one place.
 - Logging: `structlog`, never `print`. Log events as `snake_case` verbs (`retrieval_completed`).
 - No hidden network calls in tests: every external call is mocked or replayed.
+- Every source file starts with `# SPDX-License-Identifier: Apache-2.0` (code is Apache-2.0; datasets are CC BY 4.0, see `evals/datasets/LICENSE`).
 - Prompts are files (`prompts/<name>.md` with front-matter `version`, `task_tag`, `schema`), never inline strings > 3 lines.
 - Magic numbers belong in `configs/*.yaml` with a comment and an `[TUNE]` marker if not yet calibrated.
 
