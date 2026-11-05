@@ -98,14 +98,19 @@ Request traces with realistic distributions: prompt-length histogram from `route
 
 ### 2.9 `pdp-refs` (reference resolver, M1.3)
 
-Ground truth for the `refs` stage (FR-PDP-03), labeled by the owner only. `evals/datasets/pdp-refs/v0/sample.jsonl`, built once by `uv run python -m pdp_eval refs-sample` (seed recorded):
+Ground truth for the `refs` stage (FR-PDP-03), labeled by the owner only. `evals/datasets/pdp-refs/v0/sample.jsonl`, built once by `uv run python -m pdp_eval refs-sample` (seed recorded). Owner decision 2026-11-05: label **every** mention, because the population is small enough to measure exactly.
 
-- **50 mentions**, stratified by pattern type (`absolute`, `relative`, `list`, `range`, `sebagaimana`, `self`, `external`, `delegation`, `penjelasan`; multi-label), at least 5 per type where the source has that many, the rest random;
-- **20 negative sentences**: random sentences (≥ 6 words, distinct) in which the resolver found no mention; they measure missed references.
+- **Mentions, all of them**: a stratified first batch of 50 (at least 5 per pattern type where the source has that many: `absolute`, `relative`, `list`, `range`, `sebagaimana`, `self`, `external`, `delegation`, `penjelasan`), so per-pattern numbers exist early; then the rest in document order.
+- **Targeted negatives**: sentences with a trigger token (Pasal, ayat, huruf, sebagaimana, Undang-Undang, Peraturan, ketentuan) that no mention covers, with those tokens marked. Repeated sentences count once. More than 40 candidates → 40 stratified by trigger token (rarest first).
+- **Random negatives**: 10 random sentences (≥ 6 words) with no trigger and no mention, as a sanity check.
 
-Labeling (`refs-label`) shows each mention in its sentence with the proposed targets. Mentions: `correct` / `wrong` (with the right targets) / `not_reference`. Negatives: `no_reference` / `missed` (with the missed targets). Targets are unit ids, or `SELF`, `EXTERNAL`, `DELEGATION` for mentions without an internal unit. Gold targets are stored independently of the resolver.
+Labeling (`refs-label`) shows each item in its sentence. Mentions: `correct` / `wrong` (with the right targets) / `not_reference`. Negatives: `no_reference` / `missed` (with the missed targets). Targets are unit ids, or `SELF`, `EXTERNAL`, `DELEGATION` for mentions without an internal unit. Gold targets are stored independently of the resolver.
 
-Metrics (`refs-report`): the current resolver is re-run and compared on the labeled spans at target level: TP/FP/FN, precision, recall, plus exact-match items, per pattern type, for negatives, and overall. Ranges count one target per unit. Targets: **recall ≥ 95%, precision ≥ 98%** [TARGET]; precision matters more, because a false `REFERENCES` edge pulls unrelated units into graph expansion. Resolver changes after labeling are re-scored on the same labels; tuning the grammar on the labeled sample is allowed (it is a dev set), so a fresh sample is drawn before any public claim.
+Metrics (`refs-report`) re-run the current resolver on the labeled spans, at target level (TP/FP/FN). A targeted negative only counts mentions that overlap its trigger tokens.
+- **Rows:** `overall` counts each item once and is the headline. `mentions` counts each mention once. Pattern rows are **overlapping slices**. Each negative batch gets its own row.
+- **Rates:** precision, recall and exact-match rate, each with a **Wilson 95% interval**. Target-level intervals treat targets as independent.
+- **Targets:** recall ≥ 95%, precision ≥ 98% [TARGET]. Precision matters more, because a false `REFERENCES` edge pulls unrelated units into graph expansion.
+- **Resolver changes:** they are re-scored on the same labels. Tuning on these labels is allowed, since the whole population is labeled, so a claim about other sources needs a fresh labeled source.
 
 ## 3. Metric definitions
 
