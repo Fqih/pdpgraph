@@ -12,12 +12,12 @@ answer content (06-eval-plan §2.1, §3).
 ## Composition
 
 - **Size:** v0 `dev` split, about 50 items `[TARGET]`, selected by the annotator from 72
-  candidates in `v0/dev.jsonl`. v1 target is 150 items, split 40% dev / 60% test.
+  candidates in `v0/dev.jsonl`. Three more are in `v0/deferred.jsonl` and are not part of v0. v1 target is 150 items, split 40% dev / 60% test.
 - **Categories:** definition, obligation, exception, sanction, procedure, scope, multi_hop,
   temporal, unanswerable.
 - **Composition targets** (06 §2.1) `[TARGET]`: ≥ 25% multi-hop, ≥ 10% unanswerable,
   ≥ 10% English, ≥ 5% temporal. `uv run python -m pdp_eval validate` reports the actual figures.
-- **Candidate pool as proposed:** 72 items. Multi-hop 31.9%, unanswerable 11.1%, English 12.5%,
+- **Candidate pool as proposed:** 72 items. Multi-hop 30.6%, unanswerable 11.1%, English 12.5%,
   temporal 5.6% (output of `validate` on the unlabeled pool, not on the final set).
 - **Legal corpus:** UU 27/2022 only. The text is the JDIH Komdigi page, canonical body SHA-256
   `0d6f94b59455ace74f3f95e5df2ae6196e83392a4a7438dd6d9f2f7a0e079a40`. It is cross-checked against
@@ -48,8 +48,13 @@ answer content (06-eval-plan §2.1, §3).
   not correctness.
 - **Amendments:** the corpus holds only the 2022 text. Since then, UU 1/2026 has adjusted the
   Pasal 67–68 fines, and Putusan MK 151/PUU-XXII/2024 has set a binding reading of Pasal 53(1)
-  huruf b. Until those are ingested, items on flagged provisions are skipped or pinned to an
-  earlier `as_of` (GUIDELINE §6).
+  huruf b.
+  - Items on those provisions are pinned to `as_of = 2025-07-29` (the 2022 text) and will be
+    re-labeled with a current `as_of` after M4.4, to form before/after pairs.
+  - Questions on the interplay of Pasal 57 with Pasal 67–70 (KUHP Pasal 613(3)), and of Pasal
+    70(3) with KUHP Pasal 121, are open legal questions. They are deferred to
+    `v0/deferred.jsonl`.
+  - See GUIDELINE §6.
 - **Temporal items** on the Constitutional Court reading of Pasal 53 need ADR-017 ingestion
   (M4.4) before they can be evaluated.
 - **Unit ids** shown by the CLI are inferred from the source page's list nesting until

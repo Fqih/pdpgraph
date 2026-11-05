@@ -81,27 +81,31 @@ If two verdicts seem to fit, prefer the more specific one. Explain the choice in
 ## 6. `as_of` and provisions flagged as possibly affected
 
 - Default `as_of` is the labeling date. Gold labels describe the law in force on `as_of`.
-- Later instruments amend, adjust, or reinterpret some provisions of UU 27/2022. The corpus does
-  not contain them yet. Until the owner decides (ingest first, exclude, or pin), for any item
-  touching a provision below:
-  - skip it (empty verdict); or
-  - pin `as_of` to a date before the possible change (the CLI asks for `as_of`), and note why.
-- Candidate items touching these provisions carry a `FLAG …` note.
+- Later instruments amend, adjust, or reinterpret some provisions of UU 27/2022, and the corpus
+  does not contain them yet. Follow the v0 rule in the table below. Candidate items touching
+  these provisions carry a `FLAG …` note and already have the pinned `as_of`.
+- For a new question you write on one of these provisions, apply the same rule yourself (the CLI
+  asks for `as_of`).
 
 <!-- FLAGGED-PROVISIONS:START -->
 Source: amendment research of 2026-11-05 (`.context/research/2026-11-05-uu27-amendments.md`).
-The owner has not decided yet; this table holds until then.
+Owner decision of 2026-11-05. These changes are listed in `configs/pending_changes.yaml`
+(FR-PDP-20) until they are modeled in M4.4 (ADR-017, ADR-019).
 
-| Provision | Why flagged | Safe `as_of` |
+| Provision | Change | v0 rule |
 |---|---|---|
-| Pasal 53 ayat (1) huruf b | Putusan MK 151/PUU-XXII/2024 (pronounced 2025-07-30): "dan" must be read as "dan/atau" (ADR-017; ingestion in M4.4) | ≤ 2025-07-29 |
-| Pasal 67 ayat (1)–(3), Pasal 68 | UU 1/2026 Penyesuaian Pidana (effective 2026-01-02), Lampiran I no. 137: fines become "paling banyak kategori IV" (Pasal 67) and "kategori V" (Pasal 68). Prison terms are unchanged | ≤ 2026-01-01 |
-| Pasal 70 (esp. ayat (3)) | The corporate fine cap multiplies the adjusted maximum. How it interacts with KUHP Pasal 121 is unresolved | ≤ 2026-01-01 |
-| Pasal 57 together with Pasal 67–70 | KUHP Pasal 613 ayat (3) (added by UU 1/2026) puts administrative sanctions before criminal ones, and its Penjelasan names UU 27/2022. The effect is not yet confirmed | ≤ 2026-01-01 |
-| Pasal 58 ayat (5), Pasal 61 | Perkara 236/PUU-XXIV/2026 appears to be pending at the MK | skip |
-| Provisions implemented by PP 33/2026 (Pasal 10(2), 12(2), 13(3), 16(3), 34(3), 48(5), 54(3), 56(5), 57(5), 61) | PP 33/2026 takes effect 2027-01-16, so it is not in force today. Avoid questions that need PP-level detail, and any `as_of` on or after 2027-01-16 | < 2027-01-16 |
+| Pasal 53 ayat (1) huruf b | Putusan MK 151/PUU-XXII/2024 (2025-07-30): "dan" is read as "dan/atau" | Keep, with `as_of = 2025-07-29` (2022 text) and the note "re-label with as_of=today after M4.4" |
+| Pasal 67 ayat (1)–(3), Pasal 68 | UU 1/2026 Lampiran I no. 137 (2026-01-02): fines become kategori IV (Pasal 67) and V (Pasal 68) | Keep, with `as_of = 2025-07-29` and the same note |
+| Pasal 70 ayat (3) | The corporate cap multiplies the adjusted maximum | 2022-text questions: keep, with `as_of = 2025-07-29` and the same note. Questions on the interplay with KUHP Pasal 121: deferred |
+| Pasal 57 with Pasal 67–70 | KUHP Pasal 613 ayat (3) (added by UU 1/2026) puts administrative sanctions first | Deferred (open legal question; ADR-019) |
+| Pasal 58 ayat (5), Pasal 61 | Perkara 236/PUU-XXIV/2026 appears pending | Avoid |
+| Provisions implemented by PP 33/2026 (Pasal 10(2), 12(2), 13(3), 16(3), 34(3), 48(5), 54(3), 56(5), 57(5), 61) | PP 33/2026 takes effect 2027-01-16, so it is not in force today | No PP-level detail; no `as_of` on or after 2027-01-16 |
 
-Questions on Pasal 57 alone, without the criminal provisions, are not flagged.
+- **Pinned items:** after M4.4, each one gets a twin with `as_of` = the re-labeling date. That
+  turns it into a real before/after temporal pair.
+- **Deferred items** live in `v0/deferred.jsonl` with the reason in `notes`. They are not part of
+  v0 and are not labeled.
+- Questions on Pasal 57 alone, without the criminal provisions, are not flagged.
 <!-- FLAGGED-PROVISIONS:END -->
 
 ## 7. Test-retest protocol (single annotator)
@@ -134,6 +138,6 @@ The CLI needs the verified source snapshot (`make ingest SOURCE=uu27-2022`).
 
 - **Verdict prompt:** Enter skips the item; `drop` removes it after confirmation.
 - **Any prompt:** `:show N`, `:umum`, and `:quit` work everywhere.
-- **v0 selection:** there are 72 proposed candidates. Keep about 50 by dropping the rest, and
+- **v0 selection:** there are 72 proposed candidates in `dev.jsonl` (3 more are deferred). Keep about 50 by dropping the rest, and
   keep the 06 §2.1 composition targets in view: ≥ 25% multi-hop, ≥ 10% unanswerable, ≥ 10%
   English, ≥ 5% temporal. `validate` prints these percentages.
