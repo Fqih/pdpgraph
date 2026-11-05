@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Law view on the real UU 27/2022 snapshot: suggested ids land on the right text (M1.7).
+"""Law view on the real UU 27/2022 snapshot: unit ids land on the right text (M1.7, M1.2).
 
 Needs `make ingest SOURCE=uu27-2022`; run with `make test-snapshot`.
 """
@@ -17,7 +17,12 @@ REPO = Path(__file__).resolve().parents[3]
 
 @pytest.fixture(scope="module")
 def law() -> LawText:
-    return LawText.from_source("uu27-2022", REPO / "configs" / "sources", REPO / "data" / "raw")
+    return LawText.from_source(
+        "uu27-2022",
+        REPO / "configs" / "sources",
+        REPO / "data" / "raw",
+        REPO / "data" / "overrides",
+    )
 
 
 @pytest.mark.parametrize(

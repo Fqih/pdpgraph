@@ -45,7 +45,8 @@ class Session:
             return
         for line in lines:
             indent = "  " * line.depth
-            self.say(f"{indent}{line.label} {line.text}".rstrip() + f"   [{line.unit_id or ''}]")
+            text = line.text.replace("\n", "\n" + indent + "  ")
+            self.say(f"{indent}{line.label} {text}".rstrip() + f"   [{line.unit_id or ''}]")
         self.say("  Penjelasan: " + " / ".join(self.law.explanation(int(arg))))
 
     def ask(self, prompt: str) -> str:
@@ -242,6 +243,7 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--source", default="uu27-2022")
     p.add_argument("--registry", type=Path, default=Path("configs/sources"))
     p.add_argument("--raw-dir", type=Path, default=Path("data/raw"))
+    p.add_argument("--overrides-dir", type=Path, default=Path("data/overrides"))
     sub = p.add_subparsers(dest="command", required=True)
     default_file = Path("evals/datasets/pdp-golden/v0/dev.jsonl")
     for name, fn in (
@@ -274,6 +276,6 @@ def main(
     law: LawText | None = None,
 ) -> int:
     args = _parser().parse_args(argv)
-    law = law or LawText.from_source(args.source, args.registry, args.raw_dir)
+    law = law or LawText.from_source(args.source, args.registry, args.raw_dir, args.overrides_dir)
     fn: Callable[[argparse.Namespace, Session, Callable[[], datetime]], int] = args.fn
     return fn(args, Session(law, ask, out), now)

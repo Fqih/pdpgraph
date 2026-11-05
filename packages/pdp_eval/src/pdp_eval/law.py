@@ -1,110 +1,75 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Law text view for the labeling CLI (M1.7): Pasal lines with suggested unit ids.
+"""Law text view for the labeling CLI (M1.7): Pasal lines with their unit ids.
 
-Built from the verified source snapshot (pdp_ingest canonical blocks) so labeling can start
-before segmentation lands. Ayat/huruf/angka are inferred from list nesting with the drafting
-convention (UU 12/2011): a Pasal whose list follows intro text lists huruf (angka for the
-definitions in "yang dimaksud dengan:"); otherwise the first level is ayat. Once M1.3 ships the
-segmented units, the CLI should read ids from there instead.
+Built from the segmented units (`pdp_ingest.pipeline.segment_source`, overrides applied), so the
+ids the annotator types are the ids the pipeline produces.
 """
 
-import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from pdp_ingest.canonical import Block, blocks
-from pdp_ingest.fetch import element_inner_html, load_verified
+from common import ids
+from pdp_ingest.pipeline import segment_source
 from pdp_ingest.registry import load_source
-
-_PASAL = re.compile(r"Pasal (\d+)")
-_STOP = re.compile(r"Pasal \d+|BAB [IVXLC]+|Bagian \w+|Paragraf \d+|Agar setiap orang .*")
+from pdp_ingest.segment import Unit
 
 
 @dataclass(frozen=True)
 class Line:
-    unit_id: str | None  # None for intro text and continuation blocks
+    unit_id: str | None  # None for a Pasal's own text before its list
     label: str
     text: str
     depth: int = 0
 
 
-def _segment(kind: str, index: int) -> tuple[str, str]:
-    if kind == "a":
-        return f"/a{index}", f"({index})"
-    if kind == "h":
-        if index > 26:
-            raise ValueError(f"huruf index {index} out of range")
-        letter = chr(ord("a") + index - 1)
-        return f"/h{letter}", f"{letter}."
-    return f"/n{index}", f"{index}."
+def _short_label(unit: Unit) -> str:
+    """The list marker of a unit from its label ("... ayat (1)" -> "(1)", "... huruf b" -> "b.")."""
+    marker = unit.label.rsplit(" ", 1)[-1]
+    return marker if unit.kind == "AYAT" else f"{marker}."
 
 
 class LawText:
-    def __init__(self, source_id: str, body: list[Block], *, explanation_marker: str) -> None:
-        split = next(i for i, b in enumerate(body) if not b.path and b.text == explanation_marker)
+    def __init__(self, source_id: str, units: list[Unit]) -> None:
         self.source_id = source_id
-        self._tubuh = self._by_pasal(body[:split])
-        self._penjelasan = self._by_pasal(body[split + 1 :])
-        self._umum = self._before_first_pasal(body[split + 1 :])
-        self._ids = {
-            line.unit_id for n in self._tubuh for line in self.pasal(n) if line.unit_id
-        } | {f"{source_id}/pj-umum"}
+        self._units = {u.unit_id: u for u in units}
+        self._pasal: dict[int, list[Unit]] = {}
+        self._pj: dict[int, list[Unit]] = {}
+        for u in units:
+            parsed = ids.parse(u.unit_id)
+            if isinstance(parsed, ids.UnitId) and isinstance(parsed.path, ids.PasalPath):
+                path = parsed.path
+                group = self._pj if u.kind == "PENJELASAN" else self._pasal
+                group.setdefault(path.pasal, []).append(u)
 
     @classmethod
-    def from_source(cls, source_id: str, registry_dir: Path, raw_dir: Path) -> "LawText":
+    def from_source(
+        cls, source_id: str, registry_dir: Path, raw_dir: Path, overrides_dir: Path
+    ) -> "LawText":
         entry = load_source(source_id, registry_dir)
-        html_path, _ = load_verified(entry, raw_dir)
-        page = html_path.read_text(encoding="utf-8")
-        body = blocks(element_inner_html(page, entry.primary.body_element_id))
-        return cls(source_id, body, explanation_marker=entry.primary.invariants.explanation_marker)
-
-    @staticmethod
-    def _by_pasal(part: list[Block]) -> dict[int, list[Block]]:
-        out: dict[int, list[Block]] = {}
-        current: list[Block] | None = None
-        for b in part:
-            if not b.path and _STOP.fullmatch(b.text):
-                m = _PASAL.fullmatch(b.text)
-                current = out.setdefault(int(m.group(1)), []) if m else None
-            elif current is not None:
-                current.append(b)
-        return out
-
-    @staticmethod
-    def _before_first_pasal(part: list[Block]) -> list[str]:
-        out = []
-        for b in part:
-            if not b.path and _PASAL.fullmatch(b.text):
-                break
-            out.append(b.text)
-        return out
+        *_, units = segment_source(entry, raw_dir=raw_dir, overrides_dir=overrides_dir)
+        return cls(source_id, units)
 
     def pasal(self, n: int) -> list[Line]:
-        if n not in self._tubuh:
+        if n not in self._pasal:
             raise KeyError(f"Pasal {n} not in {self.source_id}")
-        base = f"{self.source_id}/p{n}"
-        lines = [Line(base, f"Pasal {n}", "")]
-        intro = [b for b in self._tubuh[n] if not b.path]
-        if not intro:
-            kinds = "ahn"
-        elif intro[0].text.endswith("yang dimaksud dengan:"):
-            kinds = "nnn"
-        else:
-            kinds = "hnn"
-        for b in self._tubuh[n]:
-            if not b.list_item_start:
-                lines.append(Line(None, "", b.text, len(b.path)))
-                continue
-            segments = [_segment(kinds[d], i) for d, i in enumerate(b.path)]
-            unit_id = base + "".join(s for s, _ in segments)
-            lines.append(Line(unit_id, segments[-1][1], b.text, len(b.path)))
+        head, *children = self._pasal[n]
+        lines = [Line(head.unit_id, head.label, "")]
+        if head.text:
+            lines.append(Line(None, "", head.text))
+        lines += [Line(u.unit_id, _short_label(u), u.text, u.depth) for u in children]
         return lines
 
     def explanation(self, n: int) -> list[str]:
-        return [b.text for b in self._penjelasan.get(n, [])]
+        """Penjelasan of Pasal n, each part prefixed with the explained sub-unit."""
+        out = []
+        for u in self._pj.get(n, []):
+            where = u.label.removeprefix(f"Penjelasan Pasal {n}").strip()
+            out.append(f"{where}: {u.text}" if where else u.text)
+        return out
 
     def general_explanation(self) -> list[str]:
-        return list(self._umum)
+        umum = self._units.get(f"{self.source_id}/pj-umum")
+        return umum.text.split("\n") if umum else []
 
     def has_unit(self, unit_id: str) -> bool:
-        return unit_id.removesuffix("#pj") in self._ids
+        return unit_id in self._units

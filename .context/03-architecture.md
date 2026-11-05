@@ -329,7 +329,7 @@ pdpgraph/                       # repo root
 │   └── reports/                # committed eval reports (markdown + json)
 ├── loadtest/                   # locust files, latency profiles, trace replays
 ├── data/
-│   ├── raw/  processed/  overrides/
+│   ├── raw/  processed/  overrides/  review/   # overrides + review lists committed
 ├── deploy/
 │   ├── compose/  grafana/  prometheus/  otel/
 ├── configs/                    # tierline.yaml, pdpgraph.yaml, models_aux.yaml, per-env overrides

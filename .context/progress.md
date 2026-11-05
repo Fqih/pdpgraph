@@ -7,7 +7,7 @@ Claude Code updates this file at the end of every session. Newest entry on top o
 | Field | Value |
 |---|---|
 | Phase | 1 — PDPGraph MVP (week 1) |
-| Current task | M1.2 extract + segment + PDF cross-check (amendment decisions recorded: FR-PDP-20, ADR-019) |
+| Current task | M1.2 done, pending the owner's review list (`data/review/uu27-2022/crosscheck.md`); next per 08: M1.3 |
 | Last updated | 2026-11-05 |
 | Release | none |
 
@@ -21,6 +21,7 @@ Claude Code updates this file at the end of every session. Newest entry on top o
 | M0.4 | done (PR #11) | models-aux fp32 CPU: `/embed`, `/rerank`, `/nli`, dynamic batching; pinned revisions in `configs/models_aux.yaml`; compose `local-llm`; offline runtime |
 | M0.5 | done (PR #8) | `common/llm/`: async `LLMClient`, cassettes (replay/record/live), `UsageLimiter`, one span per call |
 | M0.6 | done (PR #6) | Alembic `0001_initial` = 04 §6 SQL verbatim; `make migrate` idempotent; upgrade/downgrade/re-upgrade tested |
+| M1.2 | done (PR #19) | extract → segment → overrides → crosscheck stages; 519 units; 31 overrides (unconfirmed); 83 units flagged for owner review |
 | M1.1 | done (PR #16) | source registry + `fetch` stage; Komdigi HTML primary (body hash verified), salinan PDF reference; Postgres `sources` row |
 | M0.7 | blocked (billing class per 9router provider prefix pending from owner) | 9router alignment (ADR-016); tracked here only, not in 08-roadmap; does not block other tasks |
 
@@ -51,6 +52,10 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 | 2026-11-05 | models-aux latency, sequential, 30 runs after 3 warm-up, HTTP via compose; passages 51 tokens avg, query 13 (cpu-local: Ryzen 7 PRO 4750U 8C/16T, torch 8 threads, 21 GB RAM, Fedora 43, Docker 29.9.1) | `/embed` 1 query p50 328.8 / p95 392.8 ms; `/embed` 32 passages p50 5797.5 / p95 6570.3 ms; `/rerank` 1×30 p50 6993.3 / p95 7825.8 ms; `/nli` 8 pairs p50 1034.2 / p95 1425.5 ms | `scripts/bench_models_aux.py --runs 30` |
 | 2026-11-05 | models-aux after bge-m3 safetensors re-pin (same hardware) | load 7.00 / 3.86 / 3.98 s; RSS 4.66 GiB (2.31 anon + 2.35 file); high-water 4.69 GiB | service log; `/proc/1/status` |
 | 2026-11-05 | `make ingest SOURCE=uu27-2022` (fetch stage, live download of HTML 353,736 B + PDF 2,977,828 B, both verified, sources row upserted) | 2.7 s wall | `time make ingest SOURCE=uu27-2022` |
+| 2026-11-05 | `make ingest SOURCE=uu27-2022`, local verified files, stages fetch..crosscheck + sources upsert | 1.63 s wall | `time make ingest SOURCE=uu27-2022` |
+| 2026-11-05 | UU 27/2022 segmentation (M1.2) | 831 blocks; 16 BAB, 6 Bagian; units PASAL 76, AYAT 122, HURUF 144, ANGKA 13, PENJELASAN 164 (519) | `make ingest SOURCE=uu27-2022` |
+| 2026-11-05 | PDF cross-check, overrides applied (M1.2) | 83 of 519 units flagged (coverage < 0.9 or a diff not attributed to OCR); diffs: pdf 123, unclear 65, html 1 (Pasal 33 huruf b: the PDF layer carries the next item marker "c") | `make ingest`, `data/processed/uu27-2022/crosscheck.jsonl` |
+| 2026-11-05 | Branch coverage of new M1.2 modules (unit + snapshot tests) | crosscheck 100%, overrides 100%, segment 98%, pipeline 87%, pdp_eval law 100% | `pytest --cov` incl. `-m snapshot` |
 | 2026-11-05 | Core stores next to models-aux (same run) | neo4j 1.49 GiB, opensearch 1.38 GiB, postgres 20 MiB, valkey 7 MiB; host 8.3 GB available with desktop apps running | `docker stats`, `free -m` |
 
 ## Follow-ups discovered
@@ -83,7 +88,10 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 - Merges use the GitHub squash-merge button (owner decision); the recorded author/committer name is accepted as is. PR #3 was squash-merged locally (`8f03aa0`) and shows as closed.
 - Commit `9df2b74` on `main` has author name `FaqihHakim` (GitHub squash merge used the profile display name). Accepted as is by the owner; no history rewrite. Later PRs are squashed to one commit locally and merged with `--rebase`, which keeps the author `Fqih` and still lands one commit per PR.
 
-- M1.2 cross-check: Komdigi transcription errors seen so far: "menguntungkan din sendiri" (for "diri"), "sebagaimana dimaksud dalam." (stray period), Penjelasan Pasal 46 "Ayat 2" (for "Ayat (2)") followed by "Cukup jelas" without period.
+- M1.2 cross-check: Komdigi transcription errors are corrected in `data/overrides/uu27-2022.yaml` (31 entries, each with the PDF page; `confirmed_by` pending the owner). Three change meaning: "dan" for "dari" in Pasal 20(2)(c), 51(5) and the Penjelasan Umum; Pasal 26(2) lacks "peraturan". The rest are OCR-style typos (hadan, hares, hams, din, balk, anis, tidal(, dikumpullcan, seFuai, PaSal, Edvokasi), split words, and stray periods (Pasal 15(1), 67(1)). Penjelasan Pasal 46 "Ayat 2" (no parentheses) is handled by the segment grammar.
+- **M1.2 cross-check limits:** the PDF text layer is OCR as well, so coverage is a screen, not a verdict; an error shared by both texts is not detected. "menggunakan" is often missing from the PDF layer (Pasal 13, 26, 39), so those diffs are `unclear`. Units under three words have no PDF page (no trigram). Ayat counts in the snapshot agree with the PDF "(n)" markers for 8 of 10 sampled Pasal; Pasal 4 and 70 are garbled in the PDF layer.
+- **M1.2 → owner:** review `data/review/uu27-2022/crosscheck.md`: §1 overrides (set `confirmed_by`), §2 the 10 snapshot units, §3 the 83 flagged units. A Komdigi error found there becomes an override; the review file regenerates on `make ingest` and a snapshot test fails if the committed copy is stale.
+- `pdp_eval` law view now reads the segmented units (overrides applied), so the labeling CLI shows pipeline ids. `#pj` ids are accepted only where a Penjelasan unit exists (before: any body unit + `#pj`).
 - Amendment research (2026-11-05, `.context/research/2026-11-05-uu27-amendments.md`); decisions recorded (FR-PDP-20, ADR-019). The owner will confirm Lampiran I no. 137 and the guideline verdict illustrations separately:
   - UU 1/2026 Penyesuaian Pidana (effective 2026-01-02) adjusts the fines in Pasal 67(1)–(3) to kategori IV and Pasal 68 to kategori V. Recommended mapping: `SUPERSEDES`; consolidated versions need an ADR, and KUHP Pasal 79 is needed for the rupiah values.
   - KUHP Pasal 613(3) (added by UU 1/2026) puts administrative sanctions first; its Penjelasan names UU 27/2022. No relation in the 04 model fits.
@@ -137,9 +145,17 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 | 2026-11-05 | Golden tooling lives in a new workspace package `pdp_eval` (schema model, labeling CLI, test-retest log); 03 §8 updated | M1.7 |
 | 2026-11-05 | Golden v0: questions on the 2022 text of Pasal 53(1)(b), 67, 68 and 70(3) are pinned to `as_of = 2025-07-29` and noted "re-label with as_of=today after M4.4". Interplay questions (Pasal 57 with 67–70 via KUHP 613(3); 70(3) with KUHP 121) and the post-ruling Pasal 53 temporal item go to `v0/deferred.jsonl`. New Pasal 74 before/after temporal pair (g-0061/g-0075) | M1.7 |
 | 2026-11-05 | Currency guard FR-PDP-20: `configs/pending_changes.yaml` (UU 1/2026 Lampiran I no. 137; Putusan MK 151/2024; `confirmed_by` pending the owner). Aggregate step in 03 §5.2; implemented in M1.14 with tests and 4 adversarial items | FR-PDP-20 |
+| 2026-11-05 | M1.2 stage artifacts: `extract.jsonl`, `segment.jsonl` (before overrides), `units.jsonl` (overrides applied; input of later stages), `crosscheck.jsonl`. The owner's review list is committed at `data/review/<source_id>/crosscheck.md` (03 §8 tree updated). Overrides are exact single-occurrence text replacements; a stale entry fails the run | M1.2, FR-PDP-01 |
+| 2026-11-05 | pypdf (pure Python, BSD) added to `pdp-ingest` for the PDF text layer; no OCR engine | M1.2 |
 | 2026-11-05 | ADR-019: amendments are separate sources linked by `AMENDS`; consolidated text is `derived: true`, for retrieval only, never cited alone; KUHP 613(3) left as an open question. Implementation M4.4 | ADR-019 |
 
 ## Session log
+
+### 2026-11-05 — M1.2 extract + segment + PDF cross-check
+- `pdp_ingest`: `segment.py` (state machine: BAB/Bagian/Paragraf, Pasal, ayat/huruf/angka from list nesting by drafting convention, Penjelasan mapping to `#pj`), `overrides.py`, `crosscheck.py` (trigram coverage + aligned word diffs + PDF page), `pipeline.py` (stage artifacts + review list); CLI runs fetch → extract → segment → overrides → crosscheck → sources row.
+- `data/overrides/uu27-2022.yaml` (31 entries) and `data/review/uu27-2022/crosscheck.md` committed.
+- Snapshot tests: 76 Pasal (p1..p76 in order), all unit-kind counts, ayat counts for 10 Pasal, exact text of 10 units (pending the owner's PDF check), every Pasal has a Penjelasan, committed review list is current.
+- `pdp_eval/law.py` refactored onto segment output.
 
 ### 2026-11-05 — M1.7 golden guideline + labeling CLI, amendment research
 - PR #16 (M1.1) merged after the owner confirmed body hash `0d6f94b5…` and "Cukup jelas" = 126.

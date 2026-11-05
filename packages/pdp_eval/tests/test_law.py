@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Law text view for the labeling CLI: Pasal lines with suggested unit ids (M1.7)."""
+"""Law text view for the labeling CLI: Pasal lines with segmented unit ids (M1.7, M1.2)."""
 
 import pytest
 
@@ -45,15 +45,17 @@ def test_pasal_stops_at_structure_heading(law: LawText) -> None:
 
 
 def test_explanation_of_pasal_and_general(law: LawText) -> None:
-    assert law.explanation(2) == ["Ayat (1)", "Huruf b", "Akibat hukum."]
-    assert law.general_explanation() == ["I. UMUM", "Latar belakang.", "II. PASAL DEMI PASAL"]
+    assert law.explanation(1) == ["Cukup jelas."]
+    assert law.explanation(2) == ["ayat (1) huruf b: Akibat hukum."]
+    assert law.general_explanation() == ["Latar belakang."]
 
 
 @pytest.mark.parametrize(
     ("unit_id", "exists"),
     [
         ("uu27-2022/p2/a1/hb/n1", True),
-        ("uu27-2022/p2/a1/hb/n1#pj", True),
+        ("uu27-2022/p2/a1/hb#pj", True),
+        ("uu27-2022/p2/a1/hb/n1#pj", False),  # no Penjelasan for that unit
         ("uu27-2022/pj-umum", True),
         ("uu27-2022/p2/a3", False),
         ("uu27-2022/p9", False),

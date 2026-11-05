@@ -5,6 +5,7 @@ import pytest
 
 from pdp_eval.law import LawText
 from pdp_ingest.canonical import blocks
+from pdp_ingest.segment import segment
 
 HTML = (
     "<p>UNDANG-UNDANG</p><p>BAB I</p><p>KETENTUAN UMUM</p>"
@@ -24,4 +25,6 @@ HTML = (
 
 @pytest.fixture
 def law() -> LawText:
-    return LawText("uu27-2022", blocks(HTML), explanation_marker="PENJELASAN")
+    return LawText(
+        "uu27-2022", segment("uu27-2022", blocks(HTML), explanation_marker="PENJELASAN").units
+    )
