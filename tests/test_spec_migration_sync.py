@@ -41,9 +41,9 @@ def _statements(sql: str) -> list[str]:
 def test_m0_6_spec_sql_matches_migration_0001() -> None:
     spec, migration = _statements(_spec_sql()), _statements(_migration_sql())
     assert spec == migration, (
-        "04-data-model §6 SQL and migrations/versions/0001_initial.py differ. "
-        "Never edit an applied migration: write a new revision (alembic revision -m ...) "
-        "for the schema change, and update this check to cover it."
+        "04 §6 changed: write a new migration revision (alembic revision -m ...); "
+        "never edit an applied migration. 04-data-model §6 SQL and "
+        "migrations/versions/0001_initial.py differ; update this check to cover the new revision."
     )
 
 
