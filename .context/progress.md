@@ -7,7 +7,7 @@ Claude Code updates this file at the end of every session. Newest entry on top o
 | Field | Value |
 |---|---|
 | Phase | 0 — Foundations |
-| Current task | M0.5 next (M0.7 blocked; awaiting go-ahead) |
+| Current task | M0.4 next (M0.7 blocked; awaiting go-ahead) |
 | Last updated | 2026-11-05 |
 | Release | none |
 
@@ -19,7 +19,7 @@ Claude Code updates this file at the end of every session. Newest entry on top o
 | M0.2 | done (PR #5) | compose `core`: 4 stores, healthchecks, mem limits, loopback ports, non-root, digests pinned; CI integration job |
 | M0.3 | done (PR #3) | config, logging + redaction, telemetry, ids, pii; 142 tests; `make cov` gate |
 | M0.4 | todo | fp32 CPU baseline first; int8/ONNX only as measured optimization with eval delta |
-| M0.5 | todo | |
+| M0.5 | done (PR #8) | `common/llm/`: async `LLMClient`, cassettes (replay/record/live), `UsageLimiter`, one span per call |
 | M0.6 | done (PR #6) | Alembic `0001_initial` = 04 §6 SQL verbatim; `make migrate` idempotent; upgrade/downgrade/re-upgrade tested |
 | M0.7 | blocked (billing class per 9router provider prefix pending from owner) | 9router alignment (ADR-016); tracked here only, not in 08-roadmap; does not block other tasks |
 
@@ -43,6 +43,7 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 | 2026-11-05 | Cold `make up` to all 4 stores healthy (M0.2, cpu-local laptop: Ryzen 7 PRO 4750U, 21 GB RAM) | 21.8 s | `time make up` on fresh volumes |
 | 2026-11-05 | Idle store memory after start (M0.2) | neo4j 1.40 GiB, opensearch 1.40 GiB, postgres 22 MiB, valkey 3.9 MiB | `docker stats --no-stream` |
 | 2026-11-05 | Branch coverage, `common` (M0.3) | 98.89% (271 stmts, 88 branches) | `make cov` |
+| 2026-11-05 | Branch coverage, `common` (M0.5) | 99.04% (572 stmts, 156 branches) | `make cov` |
 
 ## Follow-ups discovered
 
@@ -56,6 +57,7 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 - OpenSearch built-in `indonesian` analyzer stems aggressively (observed: `pengendali`→`endali`, `pribadi`→`pribad`, `memberitahukan`→`itahu`).
 - **M1.6 plan (owner):** multi-field index: `text` = standard tokenizer + lowercase, no stemming; `text.stem` = `indonesian`; optional `text.shingle` for phrases. Query all with boosts tuned on the dev split only. Protect legal terms from the stemmer with a `keyword_marker` filter whose term list is generated from the graph's Definition nodes plus actor names (pengendali, prosesor, subjek data, ...). Measure each choice as a retrieval-recall ablation: no-stem vs stem vs multi-field vs multi-field + protected terms.
 - **M2.11 plan (owner), extend `common/pii.py`:** structural NIK validation (province/regency code shape; birth date with the +40 day offset for women), which then makes it safe to detect space- and dash-separated NIK formats; labeled KK (Kartu Keluarga) and passport numbers; tests for each new pattern plus the existing hex/UUID property test. Names and addresses stay out of scope for deterministic detection (documented known limitation).
+- M0.5 `LLMClient` limits: (1) it does not know tier locality, so it does not block `confidential`/`pii` to an external `base_url`; that guard comes with the 9router catalog (M0.7) and Tierline policy (M2). Phase 1 has no such workloads. (2) The token cap stops the *next* call, so the total can overshoot by the calls in flight. (3) `complete_json` sends `strict: true`; whether each upstream accepts pydantic-generated schemas is checked by the M0.7 probe. (4) The cassette writer applies the logging sanitizer, so a recorded body can differ from the live one if it contained secret-shaped text; PII and configured secrets are refused outright. (5) A replayed call reports the recorded latency.
 - `vm.max_map_count` is 1048576 on the dev host (Fedora default), above OpenSearch's 262144, so no sysctl change was needed.
 - Merges use the GitHub squash-merge button (owner decision); the recorded author/committer name is accepted as is. PR #3 was squash-merged locally (`8f03aa0`) and shows as closed.
 - Commit `9df2b74` on `main` has author name `FaqihHakim` (GitHub squash merge used the profile display name). Accepted as is by the owner; no history rewrite. Later PRs are squashed to one commit locally and merged with `--rebase`, which keeps the author `Fqih` and still lands one commit per PR.
@@ -84,8 +86,14 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 | 2026-11-05 | Merge with the GitHub squash button; no local squash or force-push workflows | 09 §4 |
 | 2026-11-05 | Labeled PII patterns added so `NIK3171…`-style glued values are caught | FR-GW-17 |
 | 2026-11-05 | M0.7 probe hard caps: abort at 200 calls or 200,000 total tokens, whichever first | M0.7 |
+| 2026-11-05 | `LLMClient` is async (httpx), `LLM_*` settings, mode defaults to `replay`; cassette key = SHA-256 of canonical request incl. attempt; secrets checked before PII; `make eval-record` stub until M1.16 | M0.5, NFR-06, NFR-12 |
 
 ## Session log
+
+### 2026-11-05 — M0.5 LLM client
+- `common/llm/` (`client.py`, `cassette.py`, `limiter.py`, `settings.py`, `errors.py`), `evals/cassettes/`, `make eval-record` stub; dev deps `respx`, `pytest-asyncio`.
+- Tests first with respx and the socket guard (RED on import, then GREEN): 60 new, 220 total. Mutation checks: dropping the error from the retry prompt and letting replay fall through to live each fail a test.
+- PR #7 (04 §6 vs `0001` SQL sync test) merged first.
 
 ### 2026-11-05 — M0.6 migrations
 - `common/db.py` (`PostgresSettings`, same `POSTGRES_*` vars as compose), `alembic.ini`, `migrations/` (`env.py`, `0001_initial`), `make migrate`; CI integration job runs `make migrate` twice.
