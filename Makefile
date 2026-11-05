@@ -2,6 +2,7 @@
 .PHONY: help sync lint fmt check test cov test-int eval-smoke up down up-llm up-mock up-obs ingest
 
 UV := uv run --frozen
+COMPOSE := docker compose --project-directory . -f deploy/compose/compose.yaml
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -30,9 +31,18 @@ cov: ## Tests + branch coverage gate on deterministic modules (NFR-10: >= 80%)
 test-int: ## Integration tests (needs `make up`)
 	$(UV) pytest -m integration
 
+up: .env ## Start the core stores (neo4j, opensearch, postgres, valkey) and wait until healthy
+	$(COMPOSE) --profile core up -d --wait --wait-timeout 300
+
+down: ## Stop every profile and remove project volumes (compose down -v)
+	$(COMPOSE) --profile '*' down -v --remove-orphans
+
+.env:
+	@echo "Missing .env: cp .env.example .env and set local passwords" >&2; exit 1
+
 # Targets below land in later roadmap tasks; they fail loudly until then.
-up down up-llm: ## Compose profiles (M0.2 / M0.4)
-	@echo "make $@: lands in M0.2 (core) / M0.4 (local-llm)" >&2; exit 1
+up-llm: ## Compose local-llm profile (M0.4)
+	@echo "make $@: lands in M0.4" >&2; exit 1
 
 up-mock up-obs: ## Compose profiles (M2.9)
 	@echo "make $@: lands in M2.9" >&2; exit 1

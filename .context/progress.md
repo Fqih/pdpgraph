@@ -7,7 +7,7 @@ Claude Code updates this file at the end of every session. Newest entry on top o
 | Field | Value |
 |---|---|
 | Phase | 0 — Foundations |
-| Current task | M0.2 next (M0.7 blocked; awaiting go-ahead) |
+| Current task | M0.6 next (M0.7 blocked; awaiting go-ahead) |
 | Last updated | 2026-11-05 |
 | Release | none |
 
@@ -16,7 +16,7 @@ Claude Code updates this file at the end of every session. Newest entry on top o
 | ID | Status | Notes |
 |---|---|---|
 | M0.1 | done (PR #1) | uv workspace, 8 packages, ruff/mypy/pytest, pre-commit, CI green |
-| M0.2 | todo | |
+| M0.2 | done (PR #5) | compose `core`: 4 stores, healthchecks, mem limits, loopback ports, non-root, digests pinned; CI integration job |
 | M0.3 | done (PR #3) | config, logging + redaction, telemetry, ids, pii; 142 tests; `make cov` gate |
 | M0.4 | todo | fp32 CPU baseline first; int8/ONNX only as measured optimization with eval delta |
 | M0.5 | todo | |
@@ -40,6 +40,8 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 
 | Date | What | Value | Command |
 |---|---|---|---|
+| 2026-11-05 | Cold `make up` to all 4 stores healthy (M0.2, cpu-local laptop: Ryzen 7 PRO 4750U, 21 GB RAM) | 21.8 s | `time make up` on fresh volumes |
+| 2026-11-05 | Idle store memory after start (M0.2) | neo4j 1.40 GiB, opensearch 1.40 GiB, postgres 22 MiB, valkey 3.9 MiB | `docker stats --no-stream` |
 | 2026-11-05 | Branch coverage, `common` (M0.3) | 98.89% (271 stmts, 88 branches) | `make cov` |
 
 ## Follow-ups discovered
@@ -49,6 +51,8 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 - 04 §2.1 grammar is implemented exactly as written (owner-approved): it also accepts `#pj` on Bab/def/obl/`pj-umum` and huruf/angka directly under a Pasal. Tighten only via a spec change.
 - PII patterns (`common/pii.py`) are [TUNE] and favour recall. Two rules: (1) unlabeled digit runs must not touch a letter or digit, so hex IDs, hashes, and UUIDs never match (a CI run had caught a trace ID redacted as NPWP); (2) labeled values (`NIK`, `KTP`, `No. KTP`, `nomor induk kependudukan`, `NPWP`, any case, optional space/colon/dash/dot) match even when glued to letters. **Known limitations (for README):** an unlabeled NIK/NPWP glued to letters (e.g. `abc3171…`) is missed; NIK written with internal spaces is missed unless it also passes the card Luhn check; no structural NIK validation; only mobile numbers (no landlines); no detection of names, addresses, KK/passport numbers, or other free-text PII. Any standalone 15-digit run or Luhn-valid 13–19 digit run escalates (false positives cost latency only). Measure the escalation rate on the golden set (ADR-015).
 - `.env` entries that are not fields of a settings class are ignored (one `.env` serves all services); YAML keys stay strict.
+- OpenSearch built-in `indonesian` analyzer stems aggressively (observed: `pengendali`→`endali`, `pribadi`→`pribad`, `memberitahukan`→`itahu`). Compare with a custom analyzer using a non-derivational Indonesian stemmer in M1.6 before fixing the mapping (eval delta required).
+- `vm.max_map_count` is 1048576 on the dev host (Fedora default), above OpenSearch's 262144, so no sysctl change was needed.
 - Merges use the GitHub squash-merge button (owner decision); the recorded author/committer name is accepted as is. PR #3 was squash-merged locally (`8f03aa0`) and shows as closed.
 - Commit `9df2b74` on `main` has author name `FaqihHakim` (GitHub squash merge used the profile display name). Accepted as is by the owner; no history rewrite. Later PRs are squashed to one commit locally and merged with `--rebase`, which keeps the author `Fqih` and still lands one commit per PR.
 
@@ -78,6 +82,10 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 | 2026-11-05 | M0.7 probe hard caps: abort at 200 calls or 200,000 total tokens, whichever first | M0.7 |
 
 ## Session log
+
+### 2026-11-05 — M0.2 core stores
+- `deploy/compose/compose.yaml` (`core` profile), `make up` / `make down`, `.env.example` store passwords, `tests/integration/test_core_stores.py` (14 tests, written first).
+- M0.3 follow-up merged as PR #4 (labeled PII patterns, 07 §4.1 tracing note).
 
 ### 2026-11-05 — M0.3 common
 - `common/`: `config.py` (YAML settings base), `logging.py` (JSON + SEC-12 redaction incl. runtime secret values), `telemetry.py`, `ids.py` (04 §2), `pii.py` (shared PII patterns), `errors.py`.
