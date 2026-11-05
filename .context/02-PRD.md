@@ -139,6 +139,7 @@ Acceptance:
 | FR-PDP-17 | Expose an MCP server with tools `pdp.query`, `pdp.gap_analysis`, `pdp.get_article`, `pdp.explain`. | BR-15 |
 | FR-PDP-18 | Tag every model call to Tierline with `x-data-class`: `internal` for any call whose prompt contains user question text (all online Q&A stages); `public` only for offline stages over regulation text alone (obligation extraction, synthetic dataset generation); `confidential` for any call containing user-supplied company data (gap analysis). The `LLMClient` has no default data class (ADR-015). | BR-08 |
 | FR-PDP-19 | Minimal web UI: question box, answer with clickable citations, source viewer, decision-trace graph, gap-analysis table. | BR-07 |
+| FR-PDP-20 | Currency guard: `configs/pending_changes.yaml` lists known changes not yet modeled in the corpus (affected `unit_ids`, `effective_on`, instrument, `kind ∈ {sanction_adjustment, binding_reading}`, official source URL, `confirmed_by`). Every entry is enforced, whether `confirmed_by` is set or not. A claim that cites an affected unit when `as_of ≥ effective_on` is dropped with reason `unmodeled_change`. If that leaves no claims, the system abstains with a `missing_evidence` entry naming the change. It never answers with a superseded figure or reading. | BR-02, BR-05 |
 
 ### 4.2 Tierline (FR-GW)
 

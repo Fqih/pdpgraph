@@ -123,3 +123,15 @@ Format: Context → Decision → Consequences → Alternatives rejected. Status:
 - Ruling citations use node IDs under the ruling's `source_id`; the grammar extension is minimal and lands with tests in M4.4.
 **Consequences:** Temporal answers stay faithful to both the statute text and the binding reading. Implementation (ingestion, expansion, `as_of` tests) is M4.4. Holding details are taken from the official MK PDF and confirmed by the owner before ingestion. A golden-set temporal item will cover it.
 **Rejected:** `instrument_type: OTHER` (loses semantics); a new text version of Pasal 53(1)(b) via `SUPERSEDES` (the text did not change).
+
+## ADR-019 — Amendments are separate sources; consolidation is derived, never cited alone
+**Status:** Accepted (docs only; implementation M4.4) · 2026-11-05 (ADR-018 stays reserved for within-tier fallback alternates, M2.2)
+**Context:** UU 1/2026 tentang Penyesuaian Pidana (effective 2026-01-02), Pasal II ayat (5) and Lampiran I no. 137, changes the criminal fines in UU 27/2022 Pasal 67 ayat (1)–(3) to "kategori IV" and in Pasal 68 to "kategori V". The amounts are set in KUHP (UU 1/2023) Pasal 79. The amending text lives in another statute's Lampiran, not in a re-promulgated UU 27/2022. A new `SUPERSEDES` version would have to be assembled by us, so it would not be official text.
+**Decision:**
+- The official 2022 text is never overwritten.
+- The amending instrument is its own `Source` (UU 1/2026, plus KUHP for the Pasal 79 category amounts). It links to each affected unit by `AMENDS {effective_on, lampiran_ref, operative_text_quote}`.
+- A consolidated reading may be materialized for retrieval only. It is marked `derived: true`, with provenance to both official texts. Citations always point to the official original unit and the amending provision, never to derived text alone.
+- Until a change is modeled, the currency guard (FR-PDP-20) keeps the pipeline from answering with the superseded text.
+**Open modeling question:** KUHP Pasal 613 ayat (3), added by UU 1/2026, requires administrative sanctions to be applied before criminal sanctions in "administrative laws with criminal sanctions". Its Penjelasan names UU 27/2022. This is neither a text change nor a reading change. No relation is added yet, and questions on the Pasal 57 / Pasal 67–70 interplay are deferred from the golden set.
+**Consequences:** Answers on amended provisions cite two official texts, and derived text helps retrieval without ever becoming evidence. Ingesting UU 1/2026 and KUHP (at least Pasal 79) is M4.4 work, with an extension of the §2 grammar for their unit ids. `pending_changes.yaml` entries are removed once the change is modeled.
+**Rejected:** A `SUPERSEDES` version holding our own consolidated text (not official; it would be cited as if it were law). Editing the 2022 text in place (destroys `as_of` history).

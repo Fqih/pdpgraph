@@ -7,7 +7,7 @@ Claude Code updates this file at the end of every session. Newest entry on top o
 | Field | Value |
 |---|---|
 | Phase | 1 — PDPGraph MVP (week 1) |
-| Current task | M1.7 in review (golden guideline, datasheet, labeling CLI, 72 candidates); amendment research awaiting owner decision |
+| Current task | M1.2 extract + segment + PDF cross-check (amendment decisions recorded: FR-PDP-20, ADR-019) |
 | Last updated | 2026-11-05 |
 | Release | none |
 
@@ -84,13 +84,21 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 - Commit `9df2b74` on `main` has author name `FaqihHakim` (GitHub squash merge used the profile display name). Accepted as is by the owner; no history rewrite. Later PRs are squashed to one commit locally and merged with `--rebase`, which keeps the author `Fqih` and still lands one commit per PR.
 
 - M1.2 cross-check: Komdigi transcription errors seen so far: "menguntungkan din sendiri" (for "diri"), "sebagaimana dimaksud dalam." (stray period), Penjelasan Pasal 46 "Ayat 2" (for "Ayat (2)") followed by "Cukup jelas" without period.
-- Amendment research (2026-11-05, `.context/research/2026-11-05-uu27-amendments.md`), awaiting the owner's decision after reading the primary texts:
+- Amendment research (2026-11-05, `.context/research/2026-11-05-uu27-amendments.md`); decisions recorded (FR-PDP-20, ADR-019). The owner will confirm Lampiran I no. 137 and the guideline verdict illustrations separately:
   - UU 1/2026 Penyesuaian Pidana (effective 2026-01-02) adjusts the fines in Pasal 67(1)–(3) to kategori IV and Pasal 68 to kategori V. Recommended mapping: `SUPERSEDES`; consolidated versions need an ADR, and KUHP Pasal 79 is needed for the rupiah values.
   - KUHP Pasal 613(3) (added by UU 1/2026) puts administrative sanctions first; its Penjelasan names UU 27/2022. No relation in the 04 model fits.
   - MK 151/PUU-XXII/2024 confirmed: `MODIFIES_READING` on Pasal 53(1)(b) in M4.4.
   - PP 33/2026 is promulgated but takes effect 2027-01-16.
   - The 2025 challenge to Pasal 65(2)/67(2) (135/PUU-XXIII/2025) was rejected on 2026-01-19.
   - Perkara 236/PUU-XXIV/2026 (Pasal 58(5), 61) appears pending; unconfirmed.
+
+## Watchlist (legal changes not yet in force or not decided)
+
+| Item | Status (checked 2026-11-05) | Trigger for action |
+|---|---|---|
+| PP 33/2026, Peraturan Pelaksanaan UU 27/2022 (LN 2026/88) | Promulgated 2026-07-16; takes effect **2027-01-16** (Pasal 225). Salinan read from a regional mirror only; TLN unconfirmed | Before 2027-01-16: ingest as its own PP source (official central copy needed). Re-check golden items whose answer depends on PP-level detail, and any `as_of` on or after that date |
+| Perkara 236/PUU-XXIV/2026 (Pasal 58(5), 61) | Appears pending; last hearing found 2026-08-11. Status unconfirmed (tracking.mkri.id 403) | When a putusan is pronounced: if granted or conditionally granted, add a `pending_changes.yaml` entry (binding_reading) and plan `MODIFIES_READING` (ADR-017). If rejected or inadmissible, remove from this list. Re-check before the labeling session |
+| KUHP Pasal 613(3) interplay with UU PDP sanctions | Open modeling question (ADR-019) | An official interpretation (PP, MK ruling, or guidance from the lembaga) appears. Then decide on a relation and restore the deferred golden items |
 
 ## Decisions log
 
@@ -127,6 +135,9 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 | 2026-11-05 | Registry-driven content invariants checked on every fetch before the hash: title block start, ends "Pasal 76 / Cukup jelas.", BAB I..XVI and Pasal 1..76 in the batang tubuh, Pasal 1..76 in the Penjelasan, Pasal 4 ayat (3) huruf c = "kewarganegaraan;", "Cukup jelas" = 126. **Correction:** 252 (stated earlier) was the whole-page count; the page carries the law twice (body plus tab widget); the body has 126. Salinan PDF cross-check: 16 BAB and all 76 Pasal headings present (OCR garbles 7, e.g. "Pasa722", "Pasal2T"); OCR finds 112 exact / 123 fuzzy "Cukup jelas", consistent with 126 | M1.1, SEC-14 |
 | 2026-11-05 | Second annotator: none. v0 reports intra-annotator test-retest agreement only; the datasheet says inter-annotator κ is pending a second annotator in v1 | M1.7 |
 | 2026-11-05 | Golden tooling lives in a new workspace package `pdp_eval` (schema model, labeling CLI, test-retest log); 03 §8 updated | M1.7 |
+| 2026-11-05 | Golden v0: questions on the 2022 text of Pasal 53(1)(b), 67, 68 and 70(3) are pinned to `as_of = 2025-07-29` and noted "re-label with as_of=today after M4.4". Interplay questions (Pasal 57 with 67–70 via KUHP 613(3); 70(3) with KUHP 121) and the post-ruling Pasal 53 temporal item go to `v0/deferred.jsonl`. New Pasal 74 before/after temporal pair (g-0061/g-0075) | M1.7 |
+| 2026-11-05 | Currency guard FR-PDP-20: `configs/pending_changes.yaml` (UU 1/2026 Lampiran I no. 137; Putusan MK 151/2024; `confirmed_by` pending the owner). Aggregate step in 03 §5.2; implemented in M1.14 with tests and 4 adversarial items | FR-PDP-20 |
+| 2026-11-05 | ADR-019: amendments are separate sources linked by `AMENDS`; consolidated text is `derived: true`, for retrieval only, never cited alone; KUHP 613(3) left as an open question. Implementation M4.4 | ADR-019 |
 
 ## Session log
 

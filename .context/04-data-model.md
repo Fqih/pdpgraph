@@ -109,6 +109,7 @@ Rules:
 | `USES_TERM` | `LegalUnit` → `Definition` | `count` |
 | `SUPERSEDES` | newer `LegalUnit` → older `LegalUnit` | `effective_on`, `by_source_id` |
 | `MODIFIES_READING` | `Source{instrument_type: PUTUSAN_MK}` → `LegalUnit` | `effective_on`, `holding_summary`, `operative_text_quote` (verbatim, citable quote from the ruling), `status ∈ {CONDITIONALLY_UNCONSTITUTIONAL, UNCONSTITUTIONAL, OTHER}` (§3.5, ADR-017) |
+| `AMENDS` | `Source` (amending instrument) → `LegalUnit` | `effective_on`, `lampiran_ref`, `operative_text_quote` (verbatim, citable) (§3.6, ADR-019) |
 | `IMPOSES` | `LegalUnit` → `Obligation` | |
 | `APPLIES_TO_ACTOR` | `Obligation` → `Actor` | |
 | `TRIGGERED_BY` | `Obligation` → `DataCategory` / `Concept` | `condition_text` |
@@ -143,6 +144,16 @@ A Mahkamah Konstitusi ruling changes the binding reading of a unit, not its prom
 - `as_of < effective_on`: the ruling is not returned.
 - Citations to a ruling use a `node_id` under the ruling's own `source_id` (`putusan-mk-151-2024/…`). The minimal §2 grammar extension for ruling paths, the node representation of the operative quote for citation verification, and the ID round-trip tests are specified and implemented in M4.4.
 - Holding details come from the official MK PDF only; the owner confirms the operative part before ingestion.
+
+### 3.6 Amendments and consolidated readings (ADR-019)
+
+The official text of a source is never overwritten. An amending instrument (e.g. UU 1/2026 Penyesuaian Pidana) is its own `Source`. It links to each affected unit by `AMENDS {effective_on, lampiran_ref, operative_text_quote}`. Instruments needed to resolve the amendment are also sources, e.g. KUHP Pasal 79 for the fine-category amounts.
+
+- A consolidated reading may be materialized for retrieval only. It is marked `derived: true` and carries provenance to both official texts.
+- Citations always point to the official original unit and to the amending provision. They never point to derived text alone; citation verification rejects a citation that only names a derived node.
+- `as_of < effective_on`: the amendment and any derived reading are not returned.
+- Until an amendment is modeled, the currency guard (FR-PDP-20, `configs/pending_changes.yaml`) keeps the pipeline from answering with the superseded text.
+- Implementation is M4.4.
 
 ## 4. Search index (OpenSearch)
 
@@ -373,6 +384,7 @@ Prompt and message content in `gw_requests` is **not stored** by default; only h
 
 - `configs/tierline.yaml` — tiers, prices, data-class matrix overrides (restrict-only), tenants, budgets, breaker thresholds, cache settings, router artifact path, τ defaults.
 - `configs/pdpgraph.yaml` — retrieval k values, RRF k, hop budget, rerank top-m, CRAG thresholds, NLI thresholds, prompt versions, model task tags.
+- `configs/pending_changes.yaml`: known legal changes not yet modeled in the corpus (FR-PDP-20). Each entry has `id`, `instrument`, `kind ∈ {sanction_adjustment, binding_reading}`, `effective_on`, `affected_unit_ids` (version-free, 04 §2.1), `source_url` (official), `summary`, and `confirmed_by` (`null` until the owner has read the primary text). Every entry is enforced regardless of `confirmed_by`. An entry is removed when the change is modeled (ADR-017 / ADR-019, M4.4). The loader and guard land in M1.14.
 - Prompts live in `packages/pdp_core/prompts/*.md` with front-matter `version`; their content hash contributes to `config_hash`.
 
 ## 9. Eval dataset formats

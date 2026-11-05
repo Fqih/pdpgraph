@@ -47,7 +47,7 @@ Each task has an ID (`M<phase>.<n>`), a Definition of Done (DoD), and requiremen
 | M1.11 | Expand (graph expansion with budget and path recording) | Multi-hop path recall reported vs no-expansion | FR-PDP-08 |
 | M1.12 | CRAG gate (thresholds + LLM adjudication) + Rewrite (max 1) | Thresholds calibrated on dev; decision distribution logged | FR-PDP-10 |
 | M1.13 | Generate (evidence blocks, guided JSON `GeneratedAnswer`) | Valid JSON rate ≥ 99% on dev after retry | FR-PDP-11 |
-| M1.14 | VerifyCitations (deterministic) + VerifyEntailment (NLI + optional LLM) + Aggregate + Abstain | Unit tests with adversarial fakes: invented IDs, paraphrased quotes, out-of-evidence citations all dropped | FR-PDP-12, FR-PDP-13 |
+| M1.14 | VerifyCitations (deterministic) + VerifyEntailment (NLI + optional LLM) + Aggregate (incl. currency guard) + Abstain | Unit tests with adversarial fakes: invented IDs, paraphrased quotes, and out-of-evidence citations are all dropped. Currency-guard tests: a claim on an affected unit with `as_of ≥ effective_on` is dropped as `unmodeled_change`, an emptied answer abstains naming the change, and `as_of < effective_on` passes. 4 `pdp-adversarial` items ask about current UU PDP criminal fines and Pasal 53(1)(b) with `as_of` = today | FR-PDP-12, FR-PDP-13, FR-PDP-20 |
 | M1.15 | `POST /v1/query` (+SSE), `GET /v1/articles`, `GET /v1/trace`, health; OpenAPI snapshot test | E2E test against compose stack with cassettes | FR-PDP-16 |
 
 ### Week 3 — evaluation & first report

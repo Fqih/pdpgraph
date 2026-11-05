@@ -174,8 +174,8 @@ stateDiagram-v2
 | **Generate** | LLM (tier chosen by Tierline; data class `internal`, because the prompt contains user question text — ADR-015) with guided JSON decoding into `GeneratedAnswer` schema. Evidence is provided as numbered blocks with `node_id` and text; the model may only cite provided `node_id`s and must give spans as quoted substrings. |
 | **VerifyCitations** | Deterministic: for each citation — node in evidence set, node valid at `as_of`, quoted text is a substring of node text (after normalization) → compute character span. Claims with zero valid citations are dropped. |
 | **VerifyEntailment** | NLI(premise = concatenated cited spans + parent context, hypothesis = claim). `entailment ≥ θ_e` → supported; `contradiction ≥ θ_c` → dropped and flagged; else → optional LLM verifier (routed via Tierline under the request's data class) decides; unresolved → dropped. |
-| **Aggregate** | Recompute verdict from surviving claims using rules (e.g., any obligation claim with a satisfied condition → `OBLIGATION_APPLIES`). Generated verdict is advisory; rule-based recomputation wins on conflict and the conflict is logged. |
-| **Abstain** | Build `INSUFFICIENT_EVIDENCE` response with `missing_evidence` from CRAG/verification outputs. |
+| **Aggregate** | First, the currency guard (FR-PDP-20): drop every claim that cites a unit listed in `configs/pending_changes.yaml` when `as_of ≥ effective_on`, with reason `unmodeled_change`, and record the change for `missing_evidence`. Then recompute verdict from surviving claims using rules (e.g., any obligation claim with a satisfied condition → `OBLIGATION_APPLIES`). Generated verdict is advisory; rule-based recomputation wins on conflict and the conflict is logged. |
+| **Abstain** | Build `INSUFFICIENT_EVIDENCE` response with `missing_evidence` from CRAG/verification outputs and from currency-guard drops (naming the instrument, e.g. "UU 1/2026 Lampiran I no. 137, effective 2026-01-02, not yet modeled"). |
 | **Respond** | Attach disclaimer, trace ID, timing; persist decision trace (Postgres JSONB); end OTel span. |
 
 ### 5.3 Gap analysis

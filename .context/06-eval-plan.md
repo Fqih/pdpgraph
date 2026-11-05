@@ -76,6 +76,7 @@ To test `as_of` before real amendments exist: create a **synthetic amendment sou
 - Ambiguous questions needing clarification
 - Questions that tempt the model to give legal advice for a specific case
 - Language mixing / slang
+- Currency (FR-PDP-20): at least 4 items asking about current criminal fines (Pasal 67–68, 70(3)) and Pasal 53(1)(b) with `as_of` = today, while the change is listed in `configs/pending_changes.yaml`. Expected: `abstain`, with `missing_evidence` naming the change. Answering with the 2022 figure fails. Added in M1.14.
 
 Pass criterion per item defined in the item (`expected_behavior: abstain|correct_premise|answer`).
 

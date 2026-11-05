@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: Apache-2.0
+# Known legal changes not yet modeled in the corpus (FR-PDP-20, 04 §8). The currency guard drops
+# any claim citing an affected unit when as_of >= effective_on (reason `unmodeled_change`) and
+# abstains naming the change if nothing survives. Every entry is enforced, confirmed or not;
+# `confirmed_by` is filled by the owner after reading the primary text. Remove an entry once the
+# change is modeled (ADR-017 / ADR-019, M4.4). Research: .context/research/2026-11-05-uu27-amendments.md
+changes:
+  - id: uu1-2026-lampiran-i-137
+    instrument: UU 1/2026 tentang Penyesuaian Pidana, Pasal II ayat (5) dan Lampiran I nomor 137
+    kind: sanction_adjustment
+    effective_on: 2026-01-02
+    affected_unit_ids:
+      - uu27-2022/p67/a1  # fine -> paling banyak kategori IV
+      - uu27-2022/p67/a2  # fine -> paling banyak kategori IV
+      - uu27-2022/p67/a3  # fine -> paling banyak kategori IV
+      - uu27-2022/p68     # fine -> paling banyak kategori V
+      - uu27-2022/p70/a3  # indirect: corporate cap is 10x the adjusted maximum (KUHP Pasal 121 interplay open)
+    source_url: https://peraturan.bpk.go.id/Details/337869/uu-no-1-tahun-2026
+    summary: >-
+      Criminal fines in Pasal 67 ayat (1)-(3) become "paling banyak kategori IV" and in Pasal 68
+      "paling banyak kategori V" (amounts in KUHP Pasal 79 ayat (1)); prison terms unchanged.
+    confirmed_by: null
+  - id: putusan-mk-151-puu-xxii-2024
+    instrument: Putusan Mahkamah Konstitusi Nomor 151/PUU-XXII/2024
+    kind: binding_reading
+    effective_on: 2025-07-30
+    affected_unit_ids:
+      - uu27-2022/p53/a1     # the conditions are read cumulatively via huruf b
+      - uu27-2022/p53/a1/hb  # "dan" read as "dan/atau"
+    source_url: https://www.mkri.id/public/content/persidangan/putusan/putusan_mkri_12970_1753859809.pdf
+    summary: >-
+      The word "dan" in Pasal 53 ayat (1) huruf b is conditionally unconstitutional unless read as
+      "dan/atau".
+    confirmed_by: null
