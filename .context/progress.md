@@ -21,7 +21,7 @@ Claude Code updates this file at the end of every session. Newest entry on top o
 | M0.4 | todo | fp32 CPU baseline first; int8/ONNX only as measured optimization with eval delta |
 | M0.5 | todo | |
 | M0.6 | todo | |
-| M0.7 | todo | 9router alignment (ADR-016); tracked here only, not in 08-roadmap |
+| M0.7 | blocked (billing class per 9router provider prefix pending from owner) | 9router alignment (ADR-016); tracked here only, not in 08-roadmap; does not block other tasks |
 
 Approved order: M0.1 → M0.3 → M0.7 → M0.2 → M0.6 → M0.5 → M0.4.
 
@@ -33,8 +33,8 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 - [VERIFY] Status of PDP implementing regulation(s) at build time.
 - Which hosted open-weight provider for T2 (price, Indonesian quality, structured-output support, data-retention terms)? [VERIFY]
 - Monthly API budget cap for evals and T2/T3 traffic?
-- M0.7: billing class per 9router provider prefix, and probe hard caps (calls, tokens).
-- LICENSE for the public repo (none yet).
+- M0.7: billing class per 9router provider prefix (owner).
+- GitHub profile display name (owner decides): squash merges done on GitHub take the profile name as commit author.
 
 ## Measured results (only real numbers from runs in this repo)
 
@@ -43,7 +43,8 @@ _None yet._
 ## Follow-ups discovered
 
 - ruff 0.17 formats code blocks inside Markdown by default; ruff config and pre-commit hooks are limited to `.py`/`.pyi` so tooling never rewrites `.context/`.
-- Global `core.hooksPath` on the dev machine points elsewhere, so `pre-commit install` refuses. Run `uv run pre-commit run` before committing; CI runs all hooks and a full-history gitleaks scan.
+- Global `core.hooksPath` on the dev machine points elsewhere, so `pre-commit install` refuses; it stays untouched. Run `make check` before every commit; CI runs the same hooks plus a full-history gitleaks scan.
+- Commit `9df2b74` on `main` has author name `FaqihHakim` (GitHub squash merge used the profile display name). Accepted as is by the owner; no history rewrite. Later PRs are squashed to one commit locally and merged with `--rebase`, which keeps the author `Fqih` and still lands one commit per PR.
 
 ## Decisions log
 
@@ -65,6 +66,8 @@ _None yet._
 | 2026-11-05 | M0.4 models approved (bge-m3, bge-reranker-v2-m3, mDeBERTa NLI); fp32 baseline first | 08 M0.4 |
 | 2026-11-05 | Shared deterministic PII patterns in `common/pii.py` (LLMClient cassette guard + Tierline scanner) | FR-GW-17, M0.5 |
 | 2026-11-05 | Within-tier alternates deferred to ADR-017 in M2.2 | FR-GW-02, FR-GW-09 |
+| 2026-11-05 | Code Apache-2.0 (SPDX header per file); own datasets CC BY 4.0; statute text cited to official source | 09 §2, README |
+| 2026-11-05 | M0.7 probe hard caps: abort at 200 calls or 200,000 total tokens, whichever first | M0.7 |
 
 ## Session log
 

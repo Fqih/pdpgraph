@@ -35,7 +35,7 @@ jobs:
         run: make test
 
       - name: Pre-commit hygiene hooks
-        run: uv run --frozen pre-commit run --all-files --show-diff-on-failure
+        run: make check
 
       # The pre-commit gitleaks hook only scans staged changes, so CI scans full history.
       - name: Secret scan (SEC-11)
