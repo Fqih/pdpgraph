@@ -167,6 +167,7 @@ Property-based tests (Hypothesis) over: data class × requested model × tier he
 - CLI: `uv run evals run --suite pdp-golden --split test --variants full,hybrid_no_graph --profile cpu-local`.
 - Runner calls the public API (black-box) and optionally reads decision traces (white-box metrics like retrieval recall).
 - Outputs: `evals/reports/<date>-<suite>-<short_sha>/report.md` + `results.jsonl` + `summary.json`, also written to Postgres `eval_runs`/`eval_results`.
+- Every report's setup section and `summary.json` (and `eval_runs.summary`) record, per ingested source, `overrides_total` and `overrides_unconfirmed` (from the `sources` row). Unconfirmed overrides are applied, so a report with `overrides_unconfirmed > 0` says so in its setup; the v0.1 exit gate needs 0 (08).
 - Report template sections: setup (versions, hardware), headline table, ablation table with CIs, risk–coverage plot, per-category breakdown, **top 10 failure cases with analysis**, cost summary.
 - **Replay mode** for CI: LLM responses recorded per (prompt hash, model, params) in a cassette store; CI replays deterministically with no model or API. Cassette misses fail the CI job with a clear message ("re-record with `make eval-record`").
 

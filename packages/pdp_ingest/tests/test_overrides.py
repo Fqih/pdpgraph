@@ -10,8 +10,8 @@ from pdp_ingest.overrides import (
     Override,
     OverrideError,
     apply_overrides,
+    counts,
     load_overrides,
-    summary,
 )
 from pdp_ingest.segment import Unit
 
@@ -56,12 +56,15 @@ def test_load(tmp_path: Path) -> None:
     path.write_text(
         "- {unit_id: s/p1, find: hadan, replace: badan, reason: typo, pdf_page: 2,"
         " confirmed_by: null}\n- {unit_id: s/p2, find: x, replace: y, reason: r, pdf_page: 3,"
-        " confirmed_by: faqih}\n",
+        " confirmed_by: faqih, changes_meaning: true}\n",
         encoding="utf-8",
     )
     got = load_overrides(path)
     assert got[0] == _o()
-    assert summary(got) == {"confirmed": 1, "unconfirmed": 1}
+    assert not got[0].changes_meaning
+    assert got[1].changes_meaning
+    assert counts(got) == (2, 1)
+    assert counts([]) == (0, 0)
 
 
 def test_schema_rejects_unknown_fields_and_bad_page(tmp_path: Path) -> None:

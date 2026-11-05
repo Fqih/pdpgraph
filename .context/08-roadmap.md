@@ -62,6 +62,7 @@ Each task has an ID (`M<phase>.<n>`), a Definition of Done (DoD), and requiremen
 | M1.21 | Obligation extraction stage + review queue (can trail into Phase 2) | ≥ 80% of obligations reviewed | FR-PDP-05 |
 
 **Exit gate v0.1:** EV-01, EV-03 pass; ablation report on test split committed (targets may be missed but must be reported); README shows measured table.
+Also: `overrides_unconfirmed = 0` for every ingested source (sources row and eval report setup); every manual text override has been checked by the owner against the reference page image.
 
 ## Phase 2 — Tierline MVP "Routed" (weeks 4–6) → v0.2
 

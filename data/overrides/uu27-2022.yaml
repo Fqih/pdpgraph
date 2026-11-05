@@ -33,12 +33,14 @@
   reason: '''dan'' for ''dari'' (changes meaning)'
   pdf_page: 11
   confirmed_by: null
+  changes_meaning: true
 - unit_id: uu27-2022/p26/a2
   find: ketentuan perundang-undangan
   replace: ketentuan peraturan perundang-undangan
   reason: word 'peraturan' missing
   pdf_page: 13
   confirmed_by: null
+  changes_meaning: true
 - unit_id: uu27-2022/p32/a1
   find: seFuai
   replace: sesuai
@@ -69,6 +71,7 @@
   reason: '''dan'' for ''dari'' (changes meaning)'
   pdf_page: 21
   confirmed_by: null
+  changes_meaning: true
 - unit_id: uu27-2022/p61
   find: PaSal 60
   replace: Pasal 60
@@ -183,6 +186,7 @@
   reason: '''dan'' for ''dari'' (changes meaning)'
   pdf_page: 36
   confirmed_by: null
+  changes_meaning: true
 - unit_id: uu27-2022/p4/a2/hc#pj
   find: jenis apapun
   replace: jenis apa pun

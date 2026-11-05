@@ -26,6 +26,7 @@ Every ingested document has a `Source` record (Postgres `sources` + Neo4j `:Sour
 | `sha256` | str | hash of raw file |
 | `fetched_at` | datetime | |
 | `parser_version` | str | `segment@1.3.0` |
+| `overrides_total` / `overrides_unconfirmed` | int / int | `31` / `31`: entries in `data/overrides/<source_id>.yaml`, and those without `confirmed_by`. Unconfirmed overrides are applied; the v0.1 exit gate requires `overrides_unconfirmed = 0` |
 
 ## 2. Identifier scheme
 
@@ -365,6 +366,10 @@ CREATE TABLE eval_results (
   output jsonb NOT NULL, metrics jsonb NOT NULL, judge jsonb,
   PRIMARY KEY (run_id, item_id, variant)
 );
+
+-- 0002: manual override counts per source (M1.2 safeguard)
+ALTER TABLE sources ADD COLUMN overrides_total int NOT NULL DEFAULT 0;
+ALTER TABLE sources ADD COLUMN overrides_unconfirmed int NOT NULL DEFAULT 0;
 ```
 
 Prompt and message content in `gw_requests` is **not stored** by default; only hashes and feature refs. For `pii`/`confidential`, features are computed and stored without raw text (SEC-05).

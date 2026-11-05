@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
-"""04-data-model §6 SQL and migration 0001 must not drift apart (M0.6).
+"""04-data-model §6 SQL and the migrations must not drift apart (M0.6).
 
-The spec block and the SQL executed by `0001_initial.py` are compared after removing comments
-and normalizing whitespace. No database needed.
+The spec block and the SQL executed by the migrations (in revision order) are compared after
+removing comments and normalizing whitespace. No database needed.
 """
 
 import importlib.util
@@ -11,7 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / ".context" / "04-data-model.md"
-MIGRATION = ROOT / "migrations" / "versions" / "0001_initial.py"
+MIGRATIONS = sorted((ROOT / "migrations" / "versions").glob("[0-9][0-9][0-9][0-9]_*.py"))
 
 
 def _spec_sql() -> str:
@@ -23,12 +23,15 @@ def _spec_sql() -> str:
 
 
 def _migration_sql() -> str:
-    spec = importlib.util.spec_from_file_location("migration_0001", MIGRATION)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return ";\n".join(module.UPGRADE) + ";"
+    statements: list[str] = []
+    for path in MIGRATIONS:
+        spec = importlib.util.spec_from_file_location(f"migration_{path.stem}", path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        statements += module.UPGRADE
+    return ";\n".join(statements) + ";"
 
 
 def _statements(sql: str) -> list[str]:
@@ -38,12 +41,13 @@ def _statements(sql: str) -> list[str]:
     return [s for s in sql.split(";") if s.strip()]
 
 
-def test_m0_6_spec_sql_matches_migration_0001() -> None:
+def test_m0_6_spec_sql_matches_migrations() -> None:
+    assert [p.stem[:4] for p in MIGRATIONS] == ["0001", "0002"]
     spec, migration = _statements(_spec_sql()), _statements(_migration_sql())
     assert spec == migration, (
-        "04 §6 changed: write a new migration revision (alembic revision -m ...); "
-        "never edit an applied migration. 04-data-model §6 SQL and "
-        "migrations/versions/0001_initial.py differ; update this check to cover the new revision."
+        "04 §6 changed: write a new migration revision (alembic revision -m ...) and append "
+        "its SQL to the 04 §6 block; never edit an applied migration. 04 §6 SQL and "
+        "the migrations differ."
     )
 
 

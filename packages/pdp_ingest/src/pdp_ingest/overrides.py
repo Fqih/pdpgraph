@@ -10,7 +10,6 @@ empty until the owner checks the page image; unconfirmed entries are still appli
 listed for review.
 """
 
-from collections import Counter
 from dataclasses import replace
 from pathlib import Path
 
@@ -33,6 +32,7 @@ class Override(BaseModel):
     reason: str = Field(min_length=1)
     pdf_page: int = Field(ge=1)  # 1-based page of the reference PDF with the correct wording
     confirmed_by: str | None = None
+    changes_meaning: bool = False  # reviewed first (crosscheck.md §1)
 
 
 def load_overrides(path: Path) -> list[Override]:
@@ -56,5 +56,6 @@ def apply_overrides(units: list[Unit], overrides: list[Override]) -> list[Unit]:
     return [replace(u, text=texts[u.unit_id]) if u.text != texts[u.unit_id] else u for u in units]
 
 
-def summary(overrides: list[Override]) -> Counter[str]:
-    return Counter("confirmed" if o.confirmed_by else "unconfirmed" for o in overrides)
+def counts(overrides: list[Override]) -> tuple[int, int]:
+    """(overrides_total, overrides_unconfirmed); the v0.1 exit gate needs unconfirmed = 0."""
+    return len(overrides), sum(not o.confirmed_by for o in overrides)
