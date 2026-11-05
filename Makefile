@@ -54,6 +54,10 @@ test-models: ## models-aux tests on real weights, offline (needs make models-dow
 up-llm: .env ## Compose core + local-llm (models-aux; llama.cpp T1 lands in M2.9)
 	MODELS_AUX_CACHE_DIR=$(MODELS_CACHE) $(COMPOSE) --profile core --profile local-llm up -d --build --wait --wait-timeout 600
 
+ingest: .env ## Ingest a source, e.g. make ingest SOURCE=uu27-2022 (stages so far: fetch; needs make up)
+	@test -n "$(SOURCE)" || { echo "usage: make ingest SOURCE=<source_id>" >&2; exit 1; }
+	$(UV) python -m pdp_ingest --source $(SOURCE)
+
 # Targets below land in later roadmap tasks; they fail loudly until then.
 
 up-mock up-obs: ## Compose profiles (M2.9)
@@ -64,6 +68,3 @@ eval-smoke: ## 30-item replay eval (M1.16)
 
 eval-record: ## Re-record LLM cassettes (M1.16; until then run with LLM_MODE=record)
 	@echo "make $@: lands in M1.16" >&2; exit 1
-
-ingest: ## Ingest a source, e.g. make ingest SOURCE=uu27-2022 (M1.1)
-	@echo "make $@: lands in M1.1" >&2; exit 1

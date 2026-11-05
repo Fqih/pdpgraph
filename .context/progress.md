@@ -6,8 +6,8 @@ Claude Code updates this file at the end of every session. Newest entry on top o
 
 | Field | Value |
 |---|---|
-| Phase | 0 — Foundations |
-| Current task | Phase 0 done except M0.7 (blocked); awaiting go-ahead |
+| Phase | 1 — PDPGraph MVP (week 1) |
+| Current task | M1.1 in review (PR #16, held for owner confirmation of corrected body hash); next M1.7 guideline + labeling CLI |
 | Last updated | 2026-11-05 |
 | Release | none |
 
@@ -21,6 +21,7 @@ Claude Code updates this file at the end of every session. Newest entry on top o
 | M0.4 | done (PR #11) | models-aux fp32 CPU: `/embed`, `/rerank`, `/nli`, dynamic batching; pinned revisions in `configs/models_aux.yaml`; compose `local-llm`; offline runtime |
 | M0.5 | done (PR #8) | `common/llm/`: async `LLMClient`, cassettes (replay/record/live), `UsageLimiter`, one span per call |
 | M0.6 | done (PR #6) | Alembic `0001_initial` = 04 §6 SQL verbatim; `make migrate` idempotent; upgrade/downgrade/re-upgrade tested |
+| M1.1 | in-progress (PR #16) | source registry + `fetch` stage; Komdigi HTML primary (body hash verified), salinan PDF reference; Postgres `sources` row |
 | M0.7 | blocked (billing class per 9router provider prefix pending from owner) | 9router alignment (ADR-016); tracked here only, not in 08-roadmap; does not block other tasks |
 
 Approved order: M0.1 → M0.3 → M0.7 → M0.2 → M0.6 → M0.5 → M0.4.
@@ -49,6 +50,7 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 | 2026-11-05 | models-aux process RSS after load / after benchmark, all 3 models (cpu-local: Ryzen 7 PRO 4750U 8C/16T, torch 8 threads, 21 GB RAM, Fedora 43, Docker 29.9.1) | 4.67 GiB (2.31 GiB anon + 2.36 GiB file-backed mmap); high-water 4.73 GiB. `docker stats` shows only 2.23–2.34 GiB because it excludes file pages | `/proc/1/status` in container; `docker stats` |
 | 2026-11-05 | models-aux latency, sequential, 30 runs after 3 warm-up, HTTP via compose; passages 51 tokens avg, query 13 (cpu-local: Ryzen 7 PRO 4750U 8C/16T, torch 8 threads, 21 GB RAM, Fedora 43, Docker 29.9.1) | `/embed` 1 query p50 328.8 / p95 392.8 ms; `/embed` 32 passages p50 5797.5 / p95 6570.3 ms; `/rerank` 1×30 p50 6993.3 / p95 7825.8 ms; `/nli` 8 pairs p50 1034.2 / p95 1425.5 ms | `scripts/bench_models_aux.py --runs 30` |
 | 2026-11-05 | models-aux after bge-m3 safetensors re-pin (same hardware) | load 7.00 / 3.86 / 3.98 s; RSS 4.66 GiB (2.31 anon + 2.35 file); high-water 4.69 GiB | service log; `/proc/1/status` |
+| 2026-11-05 | `make ingest SOURCE=uu27-2022` (fetch stage, live download of HTML 353,736 B + PDF 2,977,828 B, both verified, sources row upserted) | 2.7 s wall | `time make ingest SOURCE=uu27-2022` |
 | 2026-11-05 | Core stores next to models-aux (same run) | neo4j 1.49 GiB, opensearch 1.38 GiB, postgres 20 MiB, valkey 7 MiB; host 8.3 GB available with desktop apps running | `docker stats`, `free -m` |
 
 ## Follow-ups discovered
@@ -72,6 +74,8 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 - **M0.4:** real-weights tests (`make test-models`, marker `models`) are not run in CI: they need the 4.9 GB weights. CI runs the 30 fake-model unit tests. Load times are with a warm page cache; a cold read is slower (not measured; would need dropping caches).
 - **M4.4 (ADR-017):** implement `PUTUSAN_MK` ingestion, `MODIFIES_READING` expansion, `as_of` tests, minimal ruling-path grammar + ID round-trip tests, and the citable node for the operative quote. First case: Putusan MK 151/PUU-XXII/2024 → `uu27-2022/p53/a1/hb`, effective 2025-07-30 [owner confirms operative part from the official MK PDF before ingestion]. Add a golden-set temporal item for it.
 - **M1.7:** second annotator still open (owner's answer had a placeholder). If none: v0 ships without κ, the datasheet says so, and GUIDELINE.md adds the test-retest protocol (20 random items re-labeled blind ≥ 7 days later; verdict agreement + Jaccard on gold units, reported as intra-annotator); the CLI gets a blind re-label mode.
+- **M1.1 → M1.2:** the Komdigi HTML differs from the salinan in small ways seen so far: `PRESIDEN REPUBLIK INDONESIA,` appears twice after the preamble; the `Menimbang`/`Mengingat` labels are lowercase or absent (list structure only); the LN/TLN footer lines are not inside `div#produk-content`. The per-Pasal tab widget on the page lists Pasal 65–68, 71, 72 twice; it is outside the body and ignored. The M1.2 cross-check against the PDF covers all of this.
+- **M1.1:** raw page bytes differ per fetch only by CSP nonces; `snapshot_sha256` names the archived page (`87a0cbbd…`). Reused local files keep the provenance record of the download that produced them.
 - **M1.16:** reservation-based `UsageLimiter` for concurrent runs: reserve estimated prompt tokens + `max_tokens` before each call, reconcile with actual usage after.
 - Cassette entries get `sanitized: true` when redaction changed any content.
 - **M0.7:** `complete_json` sends `strict: true` only when the model's catalog capability flag says it is supported; no silent fallback.
@@ -104,13 +108,18 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 | 2026-11-05 | Labeled PII patterns added so `NIK3171…`-style glued values are caught | FR-GW-17 |
 | 2026-11-05 | M0.7 probe hard caps: abort at 200 calls or 200,000 total tokens, whichever first | M0.7 |
 | 2026-11-05 | models-aux: fp32, transformers only (no sentence-transformers), torch from the CPU index; weights in `~/.cache/pdpgraph/models` via `make models-download`; runtime `HF_HUB_OFFLINE=1` enforced at start + `local_files_only`; rerank score = sigmoid(logit); bge-m3 dense = CLS, L2-normalized; max_length 512 | M0.4 |
-| 2026-11-05 | M1.1 primary text source: JDIH Komdigi HTML (registry verifies law-body SHA-256 `aed0c358…`; raw snapshot SHA-256 also pinned); authoritative cross-check reference: salinan PDF `ed952dea…` (identical on BPK, peraturan.go.id, Komdigi, Kemenkeu); raw files in git-ignored `data/raw/`; owner checks the M1.2 manual-review list and 10 snapshot units against PDF page images | M1.1, M1.2, SEC-14 |
+| 2026-11-05 | M1.1 primary text source: JDIH Komdigi HTML (registry verifies law-body SHA-256, see correction below; raw snapshot SHA-256 also pinned); authoritative cross-check reference: salinan PDF `ed952dea…` (identical on BPK, peraturan.go.id, Komdigi, Kemenkeu); raw files in git-ignored `data/raw/`; owner checks the M1.2 manual-review list and 10 snapshot units against PDF page images | M1.1, M1.2, SEC-14 |
+| 2026-11-05 | **Correction (M1.1):** the body hash `aed0c358…` approved earlier covered only the Penjelasan (ad-hoc extraction started at the first literal `UNDANG-UNDANG REPUBLIK INDONESIA`, which first appears in the Penjelasan heading). Law body is now defined as the inner HTML of `div#produk-content` (title through Penjelasan Pasal 76): SHA-256 `36f26c294d2cd87a42499ab1456ac5424470b764c5bc296548b52fe286a90162`, stable across 5 fetches. Pending owner confirmation | M1.1, SEC-14 |
 | 2026-11-05 | MK rulings: `PUTUSAN_MK` source + `MODIFIES_READING` edge; no new text version | ADR-017, 04 §3.5 |
 | 2026-11-05 | Golden schema gains optional `proposed_by ∈ {claude, faqih, synthetic}`; `schema_version` stays 1 (unpublished); lands with the M1.7 schema model and 06 §2.1 update | M1.7 |
 | 2026-11-05 | `LLMClient` fails closed: `confidential`/`pii` only to hosts in `local_base_urls`, in every mode incl. replay; never relax | ADR-013, ADR-015 |
 | 2026-11-05 | `LLMClient` is async (httpx), `LLM_*` settings, mode defaults to `replay`; cassette key = SHA-256 of canonical request incl. attempt; secrets checked before PII; `make eval-record` stub until M1.16 | M0.5, NFR-06, NFR-12 |
 
 ## Session log
+
+### 2026-11-05 — Phase 1 kickoff, M1.1
+- PR #12 (local-endpoint check in replay), #13 (bge-m3 safetensors re-pin), #14 (03 §7 memory), #15 (ADR-017 MK rulings, docs) merged.
+- M1.1: `pdp_ingest` `registry.py`, `fetch.py`, `db.py`, `__main__.py`; `configs/sources/uu27-2022.yaml`; `make ingest`; integration DB fixture moved to `tests/integration/conftest.py`. Tests first: 22 unit (respx + socket guard) + 2 integration.
 
 ### 2026-11-05 — M0.4 models-aux, plus M0.5 follow-ups
 - PR #9: spec-drift message now starts "04 §6 changed: write a new migration revision"; follow-ups logged. PR #10: `LLMClient` local-only guard for `confidential`/`pii`.
