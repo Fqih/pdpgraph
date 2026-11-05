@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help sync lint fmt check test cov migrate test-int eval-smoke up down up-llm up-mock up-obs ingest
+.PHONY: help sync lint fmt check test cov migrate test-int eval-smoke eval-record up down up-llm up-mock up-obs ingest
 
 UV := uv run --frozen
 COMPOSE := docker compose --project-directory . -f deploy/compose/compose.yaml
@@ -51,6 +51,9 @@ up-mock up-obs: ## Compose profiles (M2.9)
 	@echo "make $@: lands in M2.9" >&2; exit 1
 
 eval-smoke: ## 30-item replay eval (M1.16)
+	@echo "make $@: lands in M1.16" >&2; exit 1
+
+eval-record: ## Re-record LLM cassettes (M1.16; until then run with LLM_MODE=record)
 	@echo "make $@: lands in M1.16" >&2; exit 1
 
 ingest: ## Ingest a source, e.g. make ingest SOURCE=uu27-2022 (M1.1)
