@@ -2,9 +2,12 @@
 """OpenSearch REST calls for `legal_units` (M1.6) over httpx; no client library needed."""
 
 import json
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
+
+from pdp_core.search.mapping import ALIAS, build_number, index_name
 
 _MODEL_KEYS = ("embedding_model", "embedding_revision", "embedding_dim")
 
@@ -29,19 +32,15 @@ def _meta(http: httpx.Client, name: str) -> dict[str, Any] | None:
     return meta
 
 
-def ensure_index(http: httpx.Client, name: str, body: dict[str, Any]) -> None:
-    """Create the index, or check that the existing one has the same embedding model."""
-    want = body["mappings"]["_meta"]
-    meta = _meta(http, name)
-    if meta is None:
-        http.put(f"/{name}", json=body).raise_for_status()
-        return
-    check_embedding(
-        meta,
-        model=want["embedding_model"],
-        revision=want["embedding_revision"],
-        dim=want["embedding_dim"],
-    )
+class IndexExistsError(Exception):
+    """A build would write into an index that already exists."""
+
+
+def create_index(http: httpx.Client, name: str, body: dict[str, Any]) -> None:
+    """Create a new index; an existing one is never written again (04 §4)."""
+    if _meta(http, name) is not None:
+        raise IndexExistsError(f"{name} exists; a build always creates a new index")
+    http.put(f"/{name}", json=body).raise_for_status()
 
 
 def bulk(http: httpx.Client, name: str, docs: list[dict[str, Any]]) -> None:
@@ -88,6 +87,58 @@ def swap_alias(http: httpx.Client, alias: str, name: str) -> list[str]:
     actions.append({"add": {"index": name, "alias": alias}})
     http.post("/_aliases", json={"actions": actions}).raise_for_status()
     return [i for i in old if i != name]
+
+
+def builds(http: httpx.Client, *, prefix: str = "") -> list[str]:
+    """Existing `legal_units_v<build>` indexes, oldest build first."""
+    r = http.get(f"/_cat/indices/{prefix}{ALIAS}_v*", params={"format": "json", "h": "index"})
+    if r.status_code == 404:
+        return []
+    r.raise_for_status()
+    numbered = [(build_number(i["index"], prefix=prefix), i["index"]) for i in r.json()]
+    return [name for n, name in sorted((n, name) for n, name in numbered if n is not None)]
+
+
+def next_build(http: httpx.Client, *, prefix: str = "") -> int:
+    existing = [build_number(n, prefix=prefix) or 0 for n in builds(http, prefix=prefix)]
+    return max(existing, default=0) + 1
+
+
+def prune(http: httpx.Client, alias: str, *, keep: int, prefix: str = "") -> list[str]:
+    """Delete all but the newest `keep` builds; never an index the alias points at."""
+    if keep < 1:
+        raise ValueError("keep must be at least 1")
+    live = set(alias_targets(http, alias))
+    doomed = [n for n in builds(http, prefix=prefix)[:-keep] if n not in live]
+    for name in doomed:
+        http.delete(f"/{name}").raise_for_status()
+    return doomed
+
+
+@dataclass(frozen=True)
+class Published:
+    name: str
+    previous: list[str]  # alias targets before the swap (kept for rollback)
+    deleted: list[str]  # builds pruned beyond the retention
+
+
+def publish(
+    http: httpx.Client,
+    docs: list[dict[str, Any]],
+    body: dict[str, Any],
+    *,
+    retention: int,
+    prefix: str = "",
+) -> Published:
+    """New build index, documents, atomic alias swap, then prune to `retention` builds."""
+    alias = prefix + ALIAS
+    name = index_name(next_build(http, prefix=prefix), prefix=prefix)
+    if name in alias_targets(http, alias):
+        raise IndexExistsError(f"{name} is live; never rebuild into the live index")
+    create_index(http, name, body)
+    bulk(http, name, docs)
+    previous = swap_alias(http, alias, name)
+    return Published(name, previous, prune(http, alias, keep=retention, prefix=prefix))
 
 
 def analyze(http: httpx.Client, index: str, field: str, text: str) -> list[str]:

@@ -261,7 +261,13 @@ Nothing is re-parsed.
 
 ## 4. Search index (OpenSearch)
 
-Index `legal_units_v{n}` (`n` = `pdp_core.search.INDEX_VERSION`, now 1), aliased as `legal_units`. It holds one document per citable `LegalUnit` of kind `AYAT`, `HURUF`, `ANGKA`, or `PASAL` when it has no ayat. Penjelasan are not documents. The `_id` is `node_id`. For UU 27/2022 this gives 313 documents: PASAL 34, AYAT 122, HURUF 144, ANGKA 13.
+Every build creates a new index `legal_units_v<build>` (the next free build number) behind the alias `legal_units`. Documents (`_id` = `node_id`):
+- every citable `LegalUnit` of kind `AYAT`, `HURUF`, `ANGKA`, or `PASAL` when it has no ayat;
+- every substantive Penjelasan unit (text not starting "Cukup jelas") as its own document of kind `PENJELASAN`. `explains` is the unit it explains (absent for the general Penjelasan, `pj-umum`). The explained unit keeps the same text in `penjelasan_text`.
+
+"Cukup jelas" units are not indexed. A Penjelasan document is citable as Penjelasan. A gloss ("Yang dimaksud dengan …") is never cited as the law's definition (M1.4).
+
+For UU 27/2022 this gives 351 documents: PASAL 34, AYAT 122, HURUF 144, ANGKA 13, PENJELASAN 38.
 
 | Field | Type | Notes |
 |---|---|---|
@@ -270,9 +276,10 @@ Index `legal_units_v{n}` (`n` = `pdp_core.search.INDEX_VERSION`, now 1), aliased
 | `source_id` | keyword | |
 | `kind` | keyword | |
 | `label` | keyword | e.g. "Pasal 46 ayat (1)" |
+| `explains` | keyword | Penjelasan documents: `unit_id` of the explained unit |
 | `text` | text, `legal_plain` (standard + lowercase, no stemming); subfields `text.stem` (`legal_stem`), `text.shingle` (`legal_shingle`) | BM25 |
-| `context_text` | text, `legal_plain` + `.stem` | structure headings (BAB, Bagian, Paragraf), then ancestor unit texts (lead-ins such as "… meliputi:"), then the unit label, joined by " / " |
-| `penjelasan_text` | text, `legal_plain` + `.stem` | Penjelasan of the unit and its ancestors, without "Cukup jelas."; lower boost |
+| `context_text` | text, `legal_plain` + `.stem` | structure headings (BAB, Bagian, Paragraf), then ancestor unit texts (lead-ins such as "… meliputi:"; for a Penjelasan, the explained unit and its ancestors), then the explained unit's label (Penjelasan only) and the unit label, joined by " / " |
+| `penjelasan_text` | text, `legal_plain` + `.stem` | Penjelasan of the unit and its ancestors, without "Cukup jelas."; empty on Penjelasan documents; lower boost |
 | `terms` | keyword[] | `term_norm` of the defined terms used (`USES_TERM`) |
 | `concepts` | keyword[] | empty until concept tagging |
 | `valid_from` / `valid_to` | date | range filter; no `valid_to` = open |
@@ -287,19 +294,24 @@ Index `legal_units_v{n}` (`n` = `pdp_core.search.INDEX_VERSION`, now 1), aliased
 **Protected terms**
 - The marker's keywords are the lowercase words of the source's defined terms and aliases (`terms.json`), plus the Actor vocabulary words (§3.1).
 - So "pengendali", "pribadi" and "prosesor" stay whole in `text.stem` while other words stem ("kewajiban" becomes "wajib"). Without the marker the stemmer turns "pengendali" into "endali" and "pribadi" into "pribad".
-- The body is committed at `tests/fixtures/uu27-2022/legal_units_v1.index.json`. A unit test pins the code to it; a snapshot test pins its keywords to a fresh ingest and its model to `configs/models_aux.yaml`.
+- The body is committed at `tests/fixtures/uu27-2022/legal_units.index.json`. A unit test pins the code to it; a snapshot test pins its keywords to a fresh ingest and its model to `configs/models_aux.yaml`.
 
 **One model per index**
-- The mapping `_meta` holds `embedding_model`, `embedding_revision`, `embedding_dim` and `index_version`.
-- `ensure_index` refuses an existing index whose `_meta` differs. `bulk` refuses documents of another model, revision or dim. The stage refuses a model change mid-run.
+- The mapping `_meta` holds `embedding_model`, `embedding_revision`, `embedding_dim` and `mapping_version`.
+- `bulk` refuses documents of another model, revision or dim, and the stage refuses a model change mid-run.
 
-**Reindexing**
-- A new mapping bumps `INDEX_VERSION`.
-- After indexing, one `_aliases` call removes `legal_units` from every other index and adds it to the new one (atomic).
-- Re-running the same version upserts by `_id`.
+**Builds, alias and retention (`store.publish`)**
+- Every build creates a new index `legal_units_v<build>`. `create_index` refuses an existing name, and a rebuild never writes into the live index.
+- After the documents are written, one `_aliases` call moves `legal_units` to the new index (atomic).
+- `prune` then keeps the newest `SEARCH_INDEX_RETENTION` builds (default 2: live + previous, for rollback by swapping the alias back) and never deletes an alias target.
+
+**Test isolation**
+- Integration tests use per-test `itest-<hex>-` index and alias names on the dev OpenSearch.
+- A guard on the test client refuses any create, delete, alias or bulk write outside `itest-*`; a test proves `legal_units` and `legal_units_v*` cannot be touched.
+- Leftover `itest-*` indices are deleted at session start and end.
 
 **Multi-vector cache**
-- During embedding, the bge-m3 ColBERT outputs (one 1024-d vector per token, ADR-020) are written per document to `data/processed/<id>/multivectors/<model>@<revision[:12]>.jsonl`, as base64 float16, keyed by `node_id` + revision.
+- During embedding, the bge-m3 ColBERT outputs (one 1024-d vector per token, ADR-020) are written per document (Penjelasan documents included) to `data/processed/<id>/multivectors/<model>@<revision[:12]>.jsonl`, as base64 float16, keyed by `node_id` + revision.
 - They are not indexed and not used; they exist for the M1.10 rerank experiment.
 
 **Query bodies (`pdp_core.search.queries`; untuned defaults)**

@@ -12,6 +12,19 @@ from common.config import YamlSettings
 Task = Literal["embed", "rerank", "nli"]
 
 
+Sha256 = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
+
+
+class Conversion(BaseModel):
+    """A pickled file converted to safetensors at download time (ADR-020)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    sha256: Sha256  # of the downloaded pickled file
+    output: Annotated[str, StringConstraints(pattern=r"^[\w.-]+\.safetensors$")]
+    output_sha256: Sha256
+
+
 class ModelSpec(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -20,13 +33,12 @@ class ModelSpec(BaseModel):
     license: str = Field(min_length=1)
     max_length: int = Field(gt=0)
     allow_patterns: list[str] = Field(min_length=1)
-    # file -> SHA-256 of files that are not safetensors; read without unpickling (ADR-020)
-    pinned_sha256: dict[str, Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]] = {}
+    convert: dict[str, Conversion] = {}  # pickled file -> its safetensors conversion
 
     @model_validator(mode="after")
-    def _pinned_are_fetched(self) -> "ModelSpec":
-        if missing := sorted(set(self.pinned_sha256) - set(self.allow_patterns)):
-            raise ValueError(f"pinned files not in allow_patterns: {missing}")
+    def _converted_are_fetched(self) -> "ModelSpec":
+        if missing := sorted(set(self.convert) - set(self.allow_patterns)):
+            raise ValueError(f"converted files not in allow_patterns: {missing}")
         return self
 
 

@@ -19,7 +19,7 @@ pytestmark = [pytest.mark.snapshot, pytest.mark.usefixtures("no_network")]
 
 REPO = Path(__file__).resolve().parents[3]
 S = "uu27-2022"
-BODY = REPO / "tests" / "fixtures" / S / "legal_units_v1.index.json"
+BODY = REPO / "tests" / "fixtures" / S / "legal_units.index.json"
 
 
 @pytest.fixture(scope="module")
@@ -58,12 +58,16 @@ def test_documents(processed: Path) -> None:
     kinds: dict[str, int] = {}
     for d in docs.values():
         kinds[d["kind"]] = kinds.get(d["kind"], 0) + 1
-    # 04 §4: Pasal only without ayat; no Penjelasan (164) and no Pasal with ayat (42)
-    assert kinds == {"PASAL": 34, "AYAT": 122, "HURUF": 144, "ANGKA": 13}
+    # 04 §4: Pasal only without ayat (42 with ayat skipped); Penjelasan only when substantive
+    # (126 "Cukup jelas" skipped)
+    assert kinds == {"PASAL": 34, "AYAT": 122, "HURUF": 144, "ANGKA": 13, "PENJELASAN": 38}
+    pj = docs[f"{S}/p4/a2/ha#pj"]
+    assert pj["explains"] == f"{S}/p4/a2/ha"
+    assert "explains" not in docs[f"{S}/pj-umum"]
     p46 = docs[f"{S}/p46/a1"]
     assert p46["context_text"].endswith(" / Pasal 46 ayat (1)")
     assert "pengendali data pribadi" in p46["terms"]
     assert f"{S}/p46" not in docs  # has ayat
-    assert not any("#pj" in u for u in docs)
+    assert not any(d["text"].startswith("Cukup jelas") for d in docs.values())
     huruf = docs[f"{S}/p4/a2/ha"]
     assert huruf["embedding_input"].startswith("Data Pribadi yang bersifat spesifik")

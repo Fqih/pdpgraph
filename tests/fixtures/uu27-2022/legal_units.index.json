@@ -4,7 +4,7 @@
    "embedding_dim": 1024,
    "embedding_model": "BAAI/bge-m3",
    "embedding_revision": "7b44caba5c06fd6f1ef1d2786261e636c38e4295",
-   "index_version": 1
+   "mapping_version": 1
   },
   "dynamic": "strict",
   "properties": {
@@ -34,6 +34,9 @@
     "type": "keyword"
    },
    "embedding_revision": {
+    "type": "keyword"
+   },
+   "explains": {
     "type": "keyword"
    },
    "kind": {

@@ -30,20 +30,26 @@ def docs(artifacts: Artifacts) -> dict[str, dict[str, object]]:
 
 
 def test_one_document_per_citable_unit(docs: dict[str, dict[str, object]]) -> None:
-    assert sorted(docs) == sorted(
-        f"s/{u}"
-        for u in (
-            "p1",
-            "p1/n1",
-            "p1/n2",
-            "p2/a1",
-            "p2/a1/ha",
-            "p2/a1/hb",
-            "p2/a2",
-            "p2/a2/ha",
-            "p3",
-        )
-    )  # no Penjelasan, no Pasal that has ayat
+    units = ("p1", "p1/n1", "p1/n2", "p2/a1", "p2/a1/ha", "p2/a1/hb", "p2/a2", "p2/a2/ha", "p3")
+    explanations = ("pj-umum", "p2/a1#pj")  # substantive only; "Cukup jelas." is not indexed
+    assert sorted(docs) == sorted(f"s/{u}" for u in units + explanations)  # no Pasal with ayat
+
+
+def test_penjelasan_documents(docs: dict[str, dict[str, object]]) -> None:
+    pj = docs["s/p2/a1#pj"]
+    assert pj["kind"] == "PENJELASAN"
+    assert pj["explains"] == "s/p2/a1"
+    assert pj["text"] == "Lihat Pasal 3."
+    assert pj["penjelasan_text"] == ""  # it is the Penjelasan
+    assert pj["context_text"] == (
+        "JENIS / Data Pribadi terdiri atas: / Pasal 2 ayat (1) / Penjelasan Pasal 2 ayat (1)"
+    )
+    assert pj["embedding_input"] == "Data Pribadi terdiri atas: Lihat Pasal 3."
+    assert docs["s/p2/a1"]["penjelasan_text"] == "Lihat Pasal 3."  # kept on the parent too
+    assert "explains" not in docs["s/p2/a1"]
+    umum = docs["s/pj-umum"]
+    assert "explains" not in umum  # explains no single unit
+    assert umum["context_text"] == "Penjelasan Umum"
 
 
 def test_document_fields(docs: dict[str, dict[str, object]]) -> None:

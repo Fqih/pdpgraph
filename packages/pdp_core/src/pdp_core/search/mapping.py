@@ -9,20 +9,28 @@ Analyzers (no stop words; BM25 idf handles them):
 
 The protected terms are the lowercase words of the source's defined terms and aliases
 (`terms.json`, M1.4) plus the Actor vocabulary (04 §3.1). `_meta` records the embedding model,
-revision and dim; one index never mixes models (`store.ensure_index`, `store.bulk`).
+revision and dim; one index never mixes models (`store.bulk`). Every build is a new index
+(`legal_units_v<build>`); `store.publish` swaps the alias and prunes old builds.
 """
 
 from collections.abc import Iterable
 from typing import Any
 
-INDEX_VERSION = 1  # bump for a new mapping; the alias swap makes it live
+MAPPING_VERSION = 1  # bump when the body changes (recorded in `_meta`)
 ALIAS = "legal_units"
 ACTORS = ("PENGENDALI", "PROSESOR", "SUBJEK_DATA", "LEMBAGA", "DPO", "PIHAK_KETIGA")
 _TEXT = {"type": "text", "analyzer": "legal_plain"}
 
 
-def index_name(version: int = INDEX_VERSION, *, prefix: str = "") -> str:
-    return f"{prefix}{ALIAS}_v{version}"
+def index_name(build: int, *, prefix: str = "") -> str:
+    """`legal_units_v<build>`: every index build gets a new name (04 §4)."""
+    return f"{prefix}{ALIAS}_v{build}"
+
+
+def build_number(name: str, *, prefix: str = "") -> int | None:
+    head = f"{prefix}{ALIAS}_v"
+    tail = name.removeprefix(head)
+    return int(tail) if name.startswith(head) and tail.isdigit() else None
 
 
 def protected_keywords(terms: Iterable[str]) -> list[str]:
@@ -74,7 +82,7 @@ def index_body(keywords: list[str], *, model: str, revision: str, dim: int) -> d
                 "embedding_model": model,
                 "embedding_revision": revision,
                 "embedding_dim": dim,
-                "index_version": INDEX_VERSION,
+                "mapping_version": MAPPING_VERSION,
             },
             "properties": {
                 "node_id": keyword,
@@ -82,6 +90,7 @@ def index_body(keywords: list[str], *, model: str, revision: str, dim: int) -> d
                 "source_id": keyword,
                 "kind": keyword,
                 "label": keyword,
+                "explains": keyword,
                 "text": _TEXT
                 | {
                     "fields": {

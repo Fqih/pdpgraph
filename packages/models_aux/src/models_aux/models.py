@@ -5,6 +5,7 @@ Loading uses `local_files_only=True` at the pinned revision, so a missing model 
 never a download. Each wrapper takes a whole batch and returns one output per input.
 """
 
+import hashlib
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -13,14 +14,15 @@ from typing import Any
 
 import structlog
 import torch
-from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
 from transformers import AutoModel, AutoModelForSequenceClassification, AutoTokenizer
 
-from models_aux.colbert import read_linear
+from models_aux.convert import converted_dir
 from models_aux.settings import ModelsAuxSettings, ModelSpec, Task
 
 NLI_LABELS = ("entailment", "neutral", "contradiction")
-COLBERT_FILE = "colbert_linear.pt"
+COLBERT_FILE = "colbert_linear.pt"  # converted to safetensors by make models-download
+PICKLED = (".pt", ".pth", ".bin", ".pkl")
 Multi = tuple[list[float], list[list[float]]]  # dense vector, one vector per token
 
 log = structlog.get_logger()
@@ -52,25 +54,27 @@ def _load(model_cls: Any, spec: ModelSpec, settings: ModelsAuxSettings) -> tuple
     return tokenizer, model
 
 
+def load_safetensors(path: Path, sha256: str) -> dict[str, torch.Tensor]:
+    """The only runtime loader for converted files: safetensors at the pinned hash, never a
+    pickle (ADR-020, SEC-13)."""
+    if path.suffix != ".safetensors" or path.suffix in PICKLED:
+        raise ValueError(f"{path.name}: refusing a pickle-format file at runtime")
+    actual = hashlib.sha256(path.read_bytes()).hexdigest()
+    if actual != sha256:
+        raise ValueError(f"{path.name}: sha256 {actual} is not the pinned {sha256}")
+    return load_file(path)
+
+
 def _colbert_head(spec: ModelSpec, settings: ModelsAuxSettings, dim: int) -> torch.nn.Linear:
-    try:
-        path = hf_hub_download(
-            spec.repo,
-            COLBERT_FILE,
-            revision=spec.revision,
-            cache_dir=settings.cache_dir,
-            local_files_only=True,
-        )
-    except OSError:
-        raise SystemExit(
-            f"{spec.repo}@{spec.revision[:12]}/{COLBERT_FILE} is not in the model cache; "
-            "run `make models-download`"
-        ) from None
-    weight, bias = read_linear(Path(path), spec.pinned_sha256[COLBERT_FILE], dim=dim)
+    conv = spec.convert[COLBERT_FILE]
+    path = converted_dir(settings.cache_dir, spec.repo, spec.revision) / conv.output
+    if not path.is_file():
+        raise SystemExit(f"{path} is missing; run `make models-download`")
+    state = load_safetensors(path, conv.output_sha256)
     head = torch.nn.Linear(dim, dim)
     with torch.no_grad():
-        head.weight.copy_(weight)
-        head.bias.copy_(bias)
+        head.weight.copy_(state["weight"].float())
+        head.bias.copy_(state["bias"].float())
     return head.eval()
 
 

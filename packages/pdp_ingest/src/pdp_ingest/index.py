@@ -1,12 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
 """`index` stage (03 §5.1, M1.6, FR-PDP-07): stage artifacts -> OpenSearch `legal_units`.
 
-One document per citable unit (04 §4): AYAT, HURUF, ANGKA, and PASAL only when it has no ayat;
-never Penjelasan. Per document:
+One document per citable unit (04 §4): AYAT, HURUF, ANGKA, PASAL only when it has no ayat, and
+every substantive Penjelasan (not "Cukup jelas.") as kind PENJELASAN with `explains` = the unit it
+explains (absent for the general Penjelasan). Per document:
 - `text`: the unit text;
 - `context_text`: structure headings (BAB, Bagian, Paragraf) top-down, the texts of the
   ancestor units (lead-ins such as "... meliputi:"), then the unit label, joined by " / ";
-- `penjelasan_text`: Penjelasan of the unit and its ancestors, "Cukup jelas." dropped;
+- `penjelasan_text`: Penjelasan of the unit and its ancestors, "Cukup jelas." dropped (empty on
+  Penjelasan documents, whose own text is `text`, and whose context adds the explained label);
 - `terms`: `term_norm` of the defined terms the unit uses (`USES_TERM`); `concepts`: empty
   until concept tagging lands;
 - `valid_from` = Source.effective_from, no `valid_to` (version 1, as in the graph);
@@ -16,8 +18,9 @@ While embedding, the bge-m3 multi-vector (ColBERT) outputs are cached per unit i
 `data/processed/<id>/multivectors/<model>@<revision[:12]>.jsonl` (float16). They are neither
 indexed nor used: they are for the M1.10 rerank experiment.
 
-The index is `legal_units_v<INDEX_VERSION>`; after indexing, the `legal_units` alias moves to it
-in one atomic call. An index never mixes embedding models or revisions.
+Every run builds a new index `legal_units_v<build>` (never the live one), moves the
+`legal_units` alias to it in one atomic call, keeps the previous build for rollback and deletes
+older ones (`SEARCH_INDEX_RETENTION`, default 2). An index never mixes embedding models.
 
 `python -m pdp_ingest.index --source uu27-2022` (`make index SOURCE=...`).
 """
@@ -27,6 +30,7 @@ import base64
 import json
 import struct
 import time
+from collections import Counter
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import date
@@ -39,14 +43,11 @@ from pdp_core.search import (
     ALIAS,
     EmbeddingMixError,
     SearchSettings,
-    bulk,
     check_embedding,
     embed,
-    ensure_index,
     index_body,
-    index_name,
     protected_keywords,
-    swap_alias,
+    publish,
 )
 from pdp_ingest.graph_load import VERSION, _jsonl
 
@@ -54,7 +55,7 @@ __all__ = ["EmbeddingMixError", "check_embedding"]
 
 Row = dict[str, Any]
 _STRUCTURES = {"BAB", "BAGIAN", "PARAGRAF"}
-_INDEXED = {"AYAT", "HURUF", "ANGKA"}
+_INDEXED = {"AYAT", "HURUF", "ANGKA"}  # plus PASAL without ayat, substantive PENJELASAN
 _NO_EXPLANATION = "Cukup jelas"
 SEP = " / "
 
@@ -67,12 +68,18 @@ class MultiVectors:
     vectors: list[list[float]]  # one per token
 
 
+def _substantive(u: Row) -> bool:
+    return u["kind"] == "PENJELASAN" and not u["text"].startswith(_NO_EXPLANATION)
+
+
 def _citable(units: list[Row]) -> list[Row]:
     has_ayat = {u["parent_id"] for u in units if u["kind"] == "AYAT"}
     return [
         u
         for u in units
-        if u["kind"] in _INDEXED or (u["kind"] == "PASAL" and u["unit_id"] not in has_ayat)
+        if u["kind"] in _INDEXED
+        or (u["kind"] == "PASAL" and u["unit_id"] not in has_ayat)
+        or _substantive(u)
     ]
 
 
@@ -89,37 +96,49 @@ def build_documents(processed: Path) -> list[Row]:
         if t["kind"] == "defined":
             terms.setdefault(t["unit_id"], set()).add(defs[t["node_id"]])
 
-    docs = []
-    for u in _citable(units):
-        chain: list[str] = []  # ancestors, nearest first
+    def ancestors(u: Row) -> list[str]:
+        """Ancestor ids, top-down; a Penjelasan's parent is the unit it explains."""
+        chain: list[str] = []
         parent = u["parent_id"]
         while parent:
             chain.append(parent)
             parent = (by_id.get(parent) or structures[parent])["parent_id"]
-        chain.reverse()
+        return chain[::-1]
+
+    docs = []
+    for u in _citable(units):
+        chain = ancestors(u)
+        units_up = [by_id[p] for p in chain if p in by_id]
         headings = [structures[p]["heading"] for p in chain if p in structures]
-        leads = [by_id[p]["text"] for p in chain if p in by_id and by_id[p]["text"]]
-        notes = [
-            by_id[f"{p}#pj"]["text"]
-            for p in [*[c for c in chain if c in by_id], u["unit_id"]]
-            if f"{p}#pj" in by_id and not by_id[f"{p}#pj"]["text"].startswith(_NO_EXPLANATION)
-        ]
-        docs.append(
-            {
-                "node_id": f"{u['unit_id']}@{VERSION}",
-                "unit_id": u["unit_id"],
-                "source_id": source["source_id"],
-                "kind": u["kind"],
-                "label": u["label"],
-                "text": u["text"],
-                "context_text": SEP.join([*headings, *leads, u["label"]]),
-                "penjelasan_text": "\n".join(notes),
-                "terms": sorted(terms.get(u["unit_id"], ())),
-                "concepts": [],
-                "valid_from": date.fromisoformat(source["effective_from"]),
-                "embedding_input": " ".join([*leads, u["text"]]),
-            }
-        )
+        leads = [a["text"] for a in units_up if a["text"]]
+        labels = [u["label"]]
+        notes: list[str] = []
+        if u["kind"] == "PENJELASAN":
+            if u["parent_id"]:
+                labels.insert(0, by_id[u["parent_id"]]["label"])
+        else:
+            notes = [
+                by_id[f"{p}#pj"]["text"]
+                for p in [*(a["unit_id"] for a in units_up), u["unit_id"]]
+                if f"{p}#pj" in by_id and _substantive(by_id[f"{p}#pj"])
+            ]
+        doc = {
+            "node_id": f"{u['unit_id']}@{VERSION}",
+            "unit_id": u["unit_id"],
+            "source_id": source["source_id"],
+            "kind": u["kind"],
+            "label": u["label"],
+            "text": u["text"],
+            "context_text": SEP.join([*headings, *leads, *labels]),
+            "penjelasan_text": "\n".join(notes),
+            "terms": sorted(terms.get(u["unit_id"], ())),
+            "concepts": [],
+            "valid_from": date.fromisoformat(source["effective_from"]),
+            "embedding_input": " ".join([*leads, u["text"]]),
+        }
+        if u["kind"] == "PENJELASAN" and u["parent_id"]:
+            doc["explains"] = u["parent_id"]
+        docs.append(doc)
     return docs
 
 
@@ -217,18 +236,19 @@ def main() -> None:
         multivector_path(processed, model, revision),
         [MultiVectors(d["node_id"], model, revision, m) for d, m in zip(docs, multi, strict=True)],
     )
-    name = index_name()
     with httpx.Client(base_url=settings.opensearch_url, timeout=120) as http:
         start = time.perf_counter()
-        ensure_index(http, name, body)
-        bulk(http, name, with_embeddings(docs, vectors, model=model, revision=revision))
-        old = swap_alias(http, ALIAS, name)
+        docs_out = with_embeddings(docs, vectors, model=model, revision=revision)
+        pub = publish(http, docs_out, body, retention=settings.index_retention)
         index_s = time.perf_counter() - start
-        stats = http.get(f"/{name}/_stats/store,docs").json()["indices"][name]["primaries"]
-    print(f"index {args.source}: {len(docs)} documents into {name} ({ALIAS} <- {name}, was {old})")
+        stats = http.get(f"/{pub.name}/_stats/store,docs").json()["indices"][pub.name]
+    kinds = Counter(d["kind"] for d in docs)
+    print(f"index {args.source}: {len(docs)} documents {dict(kinds)} into {pub.name}")
+    print(f"{ALIAS} -> {pub.name} (was {pub.previous}); pruned {pub.deleted}")
     print(f"embedding ({model}@{revision[:12]}, dense + multi-vector): {embed_s:.1f} s")
-    print(f"opensearch write + alias swap: {index_s:.1f} s")
-    print(f"docs {stats['docs']['count']}, store {stats['store']['size_in_bytes']} bytes")
+    print(f"opensearch create + write + alias swap + prune: {index_s:.1f} s")
+    primaries = stats["primaries"]
+    print(f"docs {primaries['docs']['count']}, store {primaries['store']['size_in_bytes']} bytes")
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@ from pdp_core.search import (
     ALIAS,
     FIELDS,
     bm25_body,
+    build_number,
     index_body,
     index_name,
     knn_body,
@@ -20,14 +21,18 @@ from pdp_core.search import (
 )
 
 ROOT = Path(__file__).resolve().parents[3]
-SNAPSHOT = ROOT / "tests" / "fixtures" / "uu27-2022" / "legal_units_v1.index.json"
+SNAPSHOT = ROOT / "tests" / "fixtures" / "uu27-2022" / "legal_units.index.json"
 DAY = date(2025, 1, 1)
 
 
 def test_names() -> None:
     assert ALIAS == "legal_units"
-    assert index_name() == "legal_units_v1"
-    assert index_name(2, prefix="itest-") == "itest-legal_units_v2"
+    assert index_name(1) == "legal_units_v1"
+    assert index_name(12, prefix="itest-") == "itest-legal_units_v12"
+    assert build_number("legal_units_v12") == 12
+    assert build_number("itest-ab-legal_units_v3", prefix="itest-ab-") == 3
+    assert build_number("legal_units_vx") is None
+    assert build_number("other_v1") is None
 
 
 def test_protected_keywords_are_lowercase_term_and_actor_words() -> None:
@@ -46,14 +51,14 @@ def test_index_body_fields_and_meta() -> None:
         "embedding_model": "m/x",
         "embedding_revision": "a" * 40,
         "embedding_dim": 4,
-        "index_version": 1,
+        "mapping_version": 1,
     }
     assert props["text"]["analyzer"] == "legal_plain"
     assert props["text"]["fields"]["stem"]["analyzer"] == "legal_stem"
     assert props["text"]["fields"]["shingle"]["analyzer"] == "legal_shingle"
     for f in ("context_text", "penjelasan_text"):
         assert props[f]["type"] == "text"
-    for f in ("node_id", "unit_id", "source_id", "kind", "label", "terms", "concepts"):
+    for f in ("node_id", "unit_id", "source_id", "kind", "label", "explains", "terms", "concepts"):
         assert props[f]["type"] == "keyword"
     assert props["valid_from"]["type"] == props["valid_to"]["type"] == "date"
     assert props["embedding"]["type"] == "knn_vector"
