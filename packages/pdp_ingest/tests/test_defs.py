@@ -155,3 +155,36 @@ def test_data_categories_from_classification_article(units: list[Unit]) -> None:
 def test_data_categories_need_the_classification_ayat(units: list[Unit]) -> None:
     with pytest.raises(DefsError, match="terdiri atas"):
         data_categories(units, pasal="p2")
+
+
+def _flags(units: list[Unit], unit: str) -> dict[str, tuple[tuple[int, ...], tuple[int, ...]]]:
+    defs = extract_definitions(units)
+    return {
+        u.node_id.removeprefix("s/def/"): (u.nested_spans, u.ambiguous_spans)
+        for u in link_terms(units, defs, extract_refs(units))
+        if u.unit_id == f"{S}/{unit}" and u.kind == "defined"
+    }
+
+
+def test_defined_inside_informal_is_flagged_nested(units: list[Unit]) -> None:
+    flags = _flags(units, "p2")
+    assert flags["data-pribadi"] == ((1,), ())  # "subjek [Data Pribadi]"; the first is plain
+    uses = link_terms(units, extract_definitions(units), extract_refs(units))
+    (dp,) = [
+        u
+        for u in uses
+        if u.unit_id == "s/p2" and u.node_id == "s/def/data-pribadi" and u.kind == "defined"
+    ]
+    assert dp.nested_in_informal
+    assert not dp.ambiguous_case
+
+
+def test_sentence_initial_matches_are_ambiguous_case(units: list[Unit]) -> None:
+    assert _flags(units, "p2")["data-pribadi-yang-spesifik"] == ((), (0,))
+    assert _flags(units, "pj-umum") == {"pemerintah-pusat": ((), (0,)), "data-pribadi": ((), ())}
+    informal = [
+        u
+        for u in link_terms(units, extract_definitions(units), extract_refs(units))
+        if u.kind == "informal"
+    ]
+    assert all(not u.nested_spans and not u.ambiguous_spans for u in informal)

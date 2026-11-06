@@ -7,7 +7,7 @@ Claude Code updates this file at the end of every session. Newest entry on top o
 | Field | Value |
 |---|---|
 | Phase | 1 — PDPGraph MVP (week 1) |
-| Current task | M1.4 done; waiting on owner review of `definitions.md` and labels for `pdp-terms`; next per 08: M1.5 |
+| Current task | M1.5 load_graph (after the M1.4 link-flags PR #24) |
 | Last updated | 2026-11-05 |
 | Release | none |
 
@@ -21,6 +21,7 @@ Claude Code updates this file at the end of every session. Newest entry on top o
 | M0.4 | done (PR #11) | models-aux fp32 CPU: `/embed`, `/rerank`, `/nli`, dynamic batching; pinned revisions in `configs/models_aux.yaml`; compose `local-llm`; offline runtime |
 | M0.5 | done (PR #8) | `common/llm/`: async `LLMClient`, cassettes (replay/record/live), `UsageLimiter`, one span per call |
 | M0.6 | done (PR #6) | Alembic `0001_initial` = 04 §6 SQL verbatim; `make migrate` idempotent; upgrade/downgrade/re-upgrade tested |
+| M1.4 link flags | done (PR #24) | `nested_in_informal` / `ambiguous_case` on defined links; term sample rebuilt with those quotas (unlabeled); DataCategory modeling + UNKNOWN rule documented |
 | M1.4 | done (PR #23) | `defs` stage: 11 definitions (1 alias), 400 USES_TERM links, 15 informal, 15 DataCategory candidates (proposed); review list + 40-item link sample built, labels pending |
 | M1.3 label protocol | done (PR #22) | label all 114 mentions (stratified 50 first), targeted + random negatives, overlapping slices, Wilson 95% intervals; set rebuilt (unlabeled) |
 | M1.3 | done (PR #21) | `refs` stage: 114 mentions (103 REFERENCE, 11 DELEGATION), 146 internal targets, 0 unresolved; 70-item owner sample built, labels pending |
@@ -64,7 +65,8 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 | 2026-11-05 | Reference label set (M1.3, 06 §2.9, rebuilt in PR #22), seed 20261105 | 164 items: all 114 mentions (first batch 50: absolute 10/18, relative 20/58, list 8/12, range 3/3, sebagaimana 29/75, self 12/26, external 2/2, delegation 7/11, penjelasan 3/3), 40 targeted negatives of 63 candidates (ketentuan 32, peraturan 18, sebagaimana 5, undang-undang 3), 10 random negatives. Precision/recall: not yet measured (labels pending) | `python -m pdp_eval refs-sample` |
 | 2026-11-05 | Core stores next to models-aux (same run) | neo4j 1.49 GiB, opensearch 1.38 GiB, postgres 20 MiB, valkey 7 MiB; host 8.3 GB available with desktop apps running | `docker stats`, `free -m` |
 | 2026-11-05 | UU 27/2022 definitions and term uses (M1.4) | 11 definitions (Pemerintah Pusat has alias Pemerintah); defined uses: 400 unit-term links, 490 occurrences (Data Pribadi 208, Pengendali Data Pribadi 83, Subjek Data Pribadi 65, Pelindungan Data Pribadi 62); informal: 15 links, 21 occurrences; 15 DataCategory candidates (2 classes, 7 specific, 6 general) | `make ingest`, `data/processed/uu27-2022/term_uses.jsonl` |
-| 2026-11-05 | Term-link label set (M1.4, 06 §2.10), seed 20261105 | 40 items: 30 of 400 defined links (11 terms), 10 of 15 informal (7 terms). Link precision: not yet measured (labels pending) | `python -m pdp_eval terms-sample` |
+| 2026-11-06 | Term-link flags (M1.4) | defined links with a nested occurrence: 1 of 400 (Data Pribadi in Pasal 1 angka 2); with a sentence-initial occurrence: 69 of 400 | `make ingest`, `term_uses.jsonl` |
+| 2026-11-06 | Term-link label set (M1.4, 06 §2.10, rebuilt in PR #24), seed 20261105 | 40 items: 30 of 400 defined links (11 terms; 1 of 1 nested, 12 of 69 ambiguous_case), 10 of 15 informal (7 terms). Link precision: not yet measured (labels pending) | `python -m pdp_eval terms-sample` |
 
 ## Follow-ups discovered
 
@@ -103,6 +105,8 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 - **M1.4 → owner:**
   - Review `data/review/uu27-2022/definitions.md`: 11 definitions (term and text against the PDF; the page is shown) and 15 DataCategory codes (`confirmed` / `code_change` / `not_a_category`).
   - Label `evals/datasets/pdp-terms/v0/sample.jsonl` with `uv run python -m pdp_eval terms-label`, then run `terms-report --out evals/reports/<date>-pdp-terms-<sha>/report.md`.
+- **M1.4 nested quota:** the owner asked for at least 3 nested links in the sample; UU 27/2022 has only 1, which is included. More come with later sources.
+- **M1.10/M1.11 Penjelasan glosses:** "Yang dimaksud dengan "x" adalah ..." glosses (37 occurrences in UU 27/2022) may serve as retrieval hints only (query expansion, reranker features). They are never cited as the law's definitions and never become `Definition` nodes.
 - **M1.4 linker scope:**
   - Usage linking applies to Pasal 1 definitions only. The Penjelasan's "Yang dimaksud dengan "x" adalah ..." glosses (e.g. "data biometrik") are not `Definition` nodes; the category explanations carry them.
   - A sentence-initial capitalized word counts as defined use ("Informasi" at a sentence start), and the sample will show whether that matters.
@@ -165,6 +169,13 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 | 2026-11-05 | M1.2 stage artifacts: `extract.jsonl`, `segment.jsonl` (before overrides), `units.jsonl` (overrides applied; input of later stages), `crosscheck.jsonl`. The owner's review list is committed at `data/review/<source_id>/crosscheck.md` (03 §8 tree updated). Overrides are exact single-occurrence text replacements; a stale entry fails the run | M1.2, FR-PDP-01 |
 | 2026-11-05 | M1.2 safeguards (owner): unconfirmed overrides stay applied, but the `sources` row (new columns, migration 0002, 04 §6) and every eval report record `overrides_total`/`overrides_unconfirmed`; 08 v0.1 exit gate requires `overrides_unconfirmed = 0`. Overrides gain `changes_meaning` (4 set). `crosscheck.md` follows the owner's review order (meaning-changing overrides + Pasal 26(2), other 27 overrides, 10 snapshot units, 83 flagged units worst-first); each snapshot/flagged unit has a `Review: reviewed_by: <name> \| verdict: komdigi_ok\|override_needed\|ocr_noise` line that regeneration keeps | M1.2 |
 | 2026-11-05 | M1.3 (owner): one mention per reference chain with char span, raw text, resolution and explicit range expansion; delegation phrases are mention kind DELEGATION with no graph edge yet; "Undang-Undang ini" is SELF; external instruments EXTERNAL_UNRESOLVED with the instrument kept; Penjelasan refs resolve relative to the explained unit (04 §3.7). Resolver evaluated on an owner-labeled 50+20 sample at target level, recall ≥ 95% / precision ≥ 98% [TARGET] (06 §2.9) | M1.3, FR-PDP-03 |
+| 2026-11-06 | M1.4 interpretation (owner):
+- definition units link other terms (no self-link);
+- a defined match inside an informal one is kept and flagged `nested_in_informal`;
+- sentence-initial matches are flagged `ambiguous_case`;
+- both are sampled (≥ 3, ≥ 5 where available) and reported as slices, with no rule change until labeled;
+- Penjelasan glosses are not Definitions;
+- DataCategory: `SPESIFIK`/`UMUM` parents with `SUBCATEGORY_OF`; unmappable categories give `UNKNOWN` (03 §5.3) | M1.4, FR-PDP-04 |
 | 2026-11-05 | M1.4 (owner): definitions with aliases and node ids via `assign_slugs`; longest-first usage linking, own capitalization = `USES_TERM`, lowercase = `informal` (low confidence, no edge), no self-link, count + spans per unit; terms list exported for M1.6; DataCategory vocabulary derived from Pasal 4, codes `proposed` until confirmed (replaces the [VERIFY] list in 04 §3.1); link precision on an owner-labeled 30 + 10 sample with Wilson intervals (06 §2.10) | M1.4, FR-PDP-04 |
 | 2026-11-05 | M1.3 label protocol (owner): label all mentions (stratified 50 first, then the other 64); per-pattern metrics as overlapping slices, headline over unique items, Wilson 95% intervals for every rate; targeted negatives (uncovered trigger tokens, ≤ 40 stratified by trigger) plus 10 random negatives replace the 20 random ones | M1.3, 06 §2.9 |
 | 2026-11-05 | pypdf (pure Python, BSD) added to `pdp-ingest` for the PDF text layer; no OCR engine | M1.2 |

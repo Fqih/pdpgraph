@@ -115,9 +115,17 @@ Metrics (`refs-report`) re-run the current resolver on the labeled spans, at tar
 
 Ground truth for the `defs` linker (FR-PDP-04), labeled by the owner only. The set is `evals/datasets/pdp-terms/v0/sample.jsonl`, built once by `uv run python -m pdp_eval terms-sample` (seed recorded).
 
-- **Items:** 30 `defined` links (`USES_TERM` edges, stratified by term with at least 2 per term where available) and 10 `informal` matches (stratified, at least 1 per term).
+- **Items:** 30 `defined` links (`USES_TERM` edges) and 10 `informal` matches (stratified, at least 1 per term). The 30 defined links are chosen in this order:
+  - at least 3 `nested_in_informal` links, where available;
+  - at least 5 `ambiguous_case` (sentence-initial) links, single-word terms and "Setiap Orang" first;
+  - the rest stratified by term, at least 2 per term where available.
 - **Labeling** (`terms-label`): each link is shown in its sentences with the occurrences marked. Defined link: `correct` if every marked occurrence uses the defined term. Informal match: `correct` if the lowercase text does use the defined term, which would argue for making such matches edges.
-- **Metrics** (`terms-report`): link precision = correct / labeled for defined links, per-term slices, and the informal rate, each with a Wilson 95% interval.
+- **Metrics** (`terms-report`), each rate with a Wilson 95% interval:
+  - link precision = correct / labeled for defined links, with and without nested links (`defined:without_nested`);
+  - an `ambiguous_case` slice;
+  - per-term slices;
+  - the informal rate.
+- **Rule changes:** none for nested or ambiguous matches until the labels say so.
 - **Stale items:** labels are re-checked against the current linker. A link it no longer produces is reported as stale and not scored.
 - **Definitions** are checked one by one in `data/review/<source_id>/definitions.md` (term and text against the PDF), not sampled.
 
