@@ -48,6 +48,7 @@ def create_app(models: Models, settings: ModelsAuxSettings) -> FastAPI:
     class EmbedRequest(_Body):
         inputs: list[text] = Field(min_length=1, max_length=many)
         kind: Literal["query", "passage"]  # bge-m3 needs no query/passage prefix
+        multi_vector: bool = False  # also return ColBERT token vectors (M1.6)
 
     class RerankRequest(_Body):
         query: text
@@ -62,13 +63,14 @@ def create_app(models: Models, settings: ModelsAuxSettings) -> FastAPI:
 
     size, wait = settings.max_batch, settings.max_wait_ms
     embed_b = Batcher(models.embed, max_batch=size, max_wait_ms=wait)
+    multi_b = Batcher(models.embed_multi, max_batch=size, max_wait_ms=wait)
     rerank_b = Batcher(models.rerank, max_batch=size, max_wait_ms=wait)
     nli_b = Batcher(models.nli, max_batch=size, max_wait_ms=wait)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         async with AsyncExitStack() as stack:
-            for batcher in (embed_b, rerank_b, nli_b):
+            for batcher in (embed_b, multi_b, rerank_b, nli_b):
                 await stack.enter_async_context(batcher)
             yield
 
@@ -117,8 +119,15 @@ def create_app(models: Models, settings: ModelsAuxSettings) -> FastAPI:
 
     @app.post("/embed")
     async def embed(req: EmbedRequest) -> dict[str, Any]:
-        vectors = await run(embed_b, req.inputs, "embed")
-        return {"model": models.names["embed"], "dim": models.dim, "vectors": vectors}
+        out: dict[str, Any] = {
+            "model": models.names["embed"],
+            "revision": models.revisions["embed"],
+            "dim": models.dim,
+        }
+        if not req.multi_vector:
+            return out | {"vectors": await run(embed_b, req.inputs, "embed")}
+        pairs = await run(multi_b, req.inputs, "embed_multi")
+        return out | {"vectors": [d for d, _ in pairs], "multi_vectors": [m for _, m in pairs]}
 
     @app.post("/rerank")
     async def rerank(req: RerankRequest) -> dict[str, Any]:

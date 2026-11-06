@@ -7,6 +7,7 @@ dependencies = [
     "fastapi>=0.162.0,<0.163",
     "huggingface-hub>=2.4.0,<3",
     "pdpgraph-common",
+    "safetensors>=0.8.0,<0.9",
     "torch>=2.15.0,<2.16",
     "transformers>=5.22.1,<6",
     "uvicorn>=0.54.0,<0.55",

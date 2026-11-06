@@ -58,7 +58,7 @@ Assets: company processing-activity data (confidential/PII), API keys, frontier-
 | SEC-10 | Budgets with hard caps; eval harness has its own spend cap. |
 | SEC-11 | Secrets only via environment variables / `.env` (git-ignored); `.env.example` committed; `gitleaks` in pre-commit and CI. |
 | SEC-12 | Structured logging with a redaction filter (API keys, `Authorization`, emails, phone numbers, NIK-like 16-digit numbers). |
-| SEC-13 | Pin model revisions (commit hashes) and package lockfile; prefer safetensors; `pip-audit`/`uv` audit in CI. |
+| SEC-13 | Pin model revisions (commit hashes) and package lockfile; prefer safetensors; a pickled file is pinned by SHA-256, allowlist-scanned and converted to safetensors at download time, and never loaded at runtime (ADR-020); `pip-audit`/`uv` audit in CI. |
 | SEC-14 | Source files verified by SHA-256 against the registry before ingestion. |
 | SEC-15 | Containers run as non-root; only `pdp_api`, `ui`, and `tierline` ports are published on all interfaces. Store ports (Neo4j, OpenSearch, Postgres, Valkey) are published **only on `127.0.0.1`** for host-side dev and tests; everything else is on a private Compose network. OpenSearch security plugin may be disabled in dev only. |
 | SEC-16 | PII scanner (FR-GW-17) escalates data class on detection; covered by a test set of synthetic Indonesian PII strings and near-misses; scanner output is never logged with the matched text. |
@@ -138,6 +138,7 @@ JSON logs (structlog), fields: `ts`, `level`, `service`, `request_id`, `trace_id
 
 - `make up` / `make up-llm` / `make up-obs` / `make up-mock` — compose profiles.
 - `make up-test` — throwaway Neo4j for integration tests (`127.0.0.1:7688`, tmpfs); `make test-int` needs `make up` + `make up-test`.
+- `make index SOURCE=<id>` — embed (models-aux) and index into `legal_units_v<n>`, then swap the `legal_units` alias; `make known-items SOURCE=<id>` prints per-mode smoke ranks.
 - `make ingest SOURCE=uu27-2022` — full ingestion with snapshot checks.
 - `make eval-smoke` (replay), `make eval-full PROFILE=cpu-local BUDGET_USD=<cap>`, `make eval-record`.
 - `make loadtest PROFILE=mock SCENARIO=sweep`; `make chaos`.

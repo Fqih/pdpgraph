@@ -577,6 +577,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "huggingface-hub" },
     { name = "pdpgraph-common" },
+    { name = "safetensors" },
     { name = "torch", version = "2.15.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'darwin'" },
     { name = "torch", version = "2.15.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform != 'darwin'" },
     { name = "transformers" },
@@ -588,6 +589,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.162.0,<0.163" },
     { name = "huggingface-hub", specifier = ">=2.4.0,<3" },
     { name = "pdpgraph-common", editable = "packages/common" },
+    { name = "safetensors", specifier = ">=0.8.0,<0.9" },
     { name = "torch", specifier = ">=2.15.0,<2.16", index = "https://download.pytorch.org/whl/cpu" },
     { name = "transformers", specifier = ">=5.22.1,<6" },
     { name = "uvicorn", specifier = ">=0.54.0,<0.55" },
@@ -822,12 +824,14 @@ name = "pdp-core"
 version = "0.0.0"
 source = { editable = "packages/pdp_core" }
 dependencies = [
+    { name = "httpx" },
     { name = "neo4j" },
     { name = "pdpgraph-common" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "httpx", specifier = ">=0.28.1,<0.29" },
     { name = "neo4j", specifier = ">=5.28,<7" },
     { name = "pdpgraph-common", editable = "packages/common" },
 ]

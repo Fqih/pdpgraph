@@ -4,12 +4,25 @@
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 from pydantic_settings import SettingsConfigDict
 
 from common.config import YamlSettings
 
 Task = Literal["embed", "rerank", "nli"]
+
+
+Sha256 = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
+
+
+class Conversion(BaseModel):
+    """A pickled file converted to safetensors at download time (ADR-020)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    sha256: Sha256  # of the downloaded pickled file
+    output: Annotated[str, StringConstraints(pattern=r"^[\w.-]+\.safetensors$")]
+    output_sha256: Sha256
 
 
 class ModelSpec(BaseModel):
@@ -20,6 +33,13 @@ class ModelSpec(BaseModel):
     license: str = Field(min_length=1)
     max_length: int = Field(gt=0)
     allow_patterns: list[str] = Field(min_length=1)
+    convert: dict[str, Conversion] = {}  # pickled file -> its safetensors conversion
+
+    @model_validator(mode="after")
+    def _converted_are_fetched(self) -> "ModelSpec":
+        if missing := sorted(set(self.convert) - set(self.allow_patterns)):
+            raise ValueError(f"converted files not in allow_patterns: {missing}")
+        return self
 
 
 class ModelsAuxSettings(YamlSettings):

@@ -135,3 +135,27 @@ Format: Context → Decision → Consequences → Alternatives rejected. Status:
 **Open modeling question:** KUHP Pasal 613 ayat (3), added by UU 1/2026, requires administrative sanctions to be applied before criminal sanctions in "administrative laws with criminal sanctions". Its Penjelasan names UU 27/2022. This is neither a text change nor a reading change. No relation is added yet, and questions on the Pasal 57 / Pasal 67–70 interplay are deferred from the golden set.
 **Consequences:** Answers on amended provisions cite two official texts, and derived text helps retrieval without ever becoming evidence. Ingesting UU 1/2026 and KUHP (at least Pasal 79) is M4.4 work, with an extension of the §2 grammar for their unit ids. `pending_changes.yaml` entries are removed once the change is modeled.
 **Rejected:** A `SUPERSEDES` version holding our own consolidated text (not official; it would be cited as if it were law). Editing the 2022 text in place (destroys `as_of` history).
+
+## ADR-020 — Pickled head files are converted to safetensors at download time
+**Status:** Accepted · 2026-11-06 (M1.6; revised the same day on owner review: runtime static-pickle parsing replaced by download-time conversion)
+**Context:** The owner asked for bge-m3 multi-vector (ColBERT) outputs per unit, cached for the M1.10 rerank experiment. The pinned revision ships the ColBERT head only as `colbert_linear.pt`, a `torch.save` pickle (one fp16 `Linear(1024, 1024)` state dict, 2,100,674 bytes). SEC-13 prefers safetensors, and the service never loads a pickle.
+**Decision:** Pickled files are converted once, in `make models-download`, following the pattern used for bge-m3 `model.safetensors`.
+- **Download time** (`models_aux.convert`):
+  - the downloaded file must match the SHA-256 pinned in `configs/models_aux.yaml` (`convert.<file>.sha256`);
+  - pre-check: `data.pkl` is disassembled with `pickletools.genops`, which executes nothing, and any global outside `OrderedDict`, `torch._utils._rebuild_tensor_v2`, `HalfStorage` and `FloatStorage` is refused;
+  - only then: `torch.load(weights_only=True)`, then `safetensors.torch.save_file` into `<cache>/converted/<repo>@<revision>/`;
+  - the output's SHA-256 must match the pinned `output_sha256` (`ff52a5f0…`; the output is deterministic). A mismatch deletes the output and fails.
+- **Runtime:**
+  - the service loads only the safetensors output, at its pinned hash (`models.load_safetensors`), and refuses any `.pt`/`.pth`/`.bin`/`.pkl` path;
+  - a unit test shows the runtime head never calls `torch.load` and works with the pickle deleted.
+- **Check:** a `models` test keeps the converted tensors bit-identical to `torch.load(weights_only=True)` of the pinned `.pt`.
+- **API:** `/embed` returns multi-vectors only on request (`multi_vector: true`). They are computed as in bge-m3: head over the token states after CLS, L2-normalized, padding dropped. They are cached, never indexed, and never used for answers.
+- If `sparse_linear.pt` is ever needed, it follows the same path.
+**Consequences:**
+- A pickle is never loaded at runtime (SEC-13).
+- The model cache holds one extra 2 MB download and its converted copy; `make models-download` must be re-run before the service can start.
+- A changed upstream file fails the source hash; a changed conversion fails the output hash. The dense path is unchanged.
+**Rejected:**
+- Static pickle parsing at runtime (first version of this ADR). It loaded no pickle, but kept pickle-format input in the runtime path.
+- `torch.load(weights_only=True)` at runtime.
+- A third-party safetensors conversion (unpinned provenance).
