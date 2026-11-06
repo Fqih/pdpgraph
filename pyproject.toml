@@ -102,6 +102,7 @@ addopts = [
 markers = [
     "integration: needs the compose stack (make up); run with make test-int",
     "snapshot: ingestion snapshot tests on the real source (EV-03)",
+    "needs_corpus: needs the git-ignored law text (data/processed); local only, skips without it",
     "eval_smoke: 30-item replay eval (EV-01)",
     "models: models-aux on real weights (make models-download); run with make test-models",
 ]

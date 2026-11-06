@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help sync lint fmt check test cov migrate test-int eval-smoke eval-record up down up-llm up-mock up-obs ingest models-download test-models test-snapshot load-graph
+.PHONY: help sync lint fmt check test cov migrate test-int up-test eval-smoke eval-record up down up-llm up-mock up-obs ingest models-download test-models test-snapshot load-graph
 
 UV := uv run --frozen
 COMPOSE := docker compose --project-directory . -f deploy/compose/compose.yaml
@@ -28,11 +28,14 @@ test: ## Unit + property + contract tests
 cov: ## Tests + branch coverage gate on deterministic modules (NFR-10: >= 80%)
 	$(UV) pytest --cov=common --cov-branch --cov-report=term-missing --cov-fail-under=80
 
-test-int: ## Integration tests (needs `make up`)
+test-int: ## Integration tests (needs `make up` and `make up-test`)
 	$(UV) pytest -m integration
 
 up: .env ## Start the core stores (neo4j, opensearch, postgres, valkey) and wait until healthy
 	$(COMPOSE) --profile core up -d --wait --wait-timeout 300
+
+up-test: .env ## Start the throwaway Neo4j test instance (127.0.0.1:7688, tmpfs) for make test-int
+	$(COMPOSE) --profile test up -d --wait --wait-timeout 300
 
 down: ## Stop every profile and remove project volumes (compose down -v)
 	$(COMPOSE) --profile '*' down -v --remove-orphans

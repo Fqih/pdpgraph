@@ -17,6 +17,7 @@ only, SUBCATEGORY_OF. Delegations, SELF and external mentions, and informal-only
 """
 
 import argparse
+import hashlib
 import json
 import time
 import unicodedata
@@ -56,6 +57,10 @@ def text_norm(text: str) -> str:
 
 def _node(unit_id: str) -> str:
     return f"{unit_id}@{VERSION}"
+
+
+def _sha256(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def _jsonl(path: Path) -> list[Row]:
@@ -130,6 +135,7 @@ def read_graph(processed: Path, review: Path) -> GraphData:
             "label": u["label"],
             "text": u["text"],
             "text_norm": text_norm(u["text"]),
+            "text_sha256": _sha256(u["text"]),
             "order": u["order"],
             "version": VERSION,
             "valid_from": source["effective_from"],
@@ -171,6 +177,7 @@ def read_graph(processed: Path, review: Path) -> GraphData:
                 "term_norm": d["term_norm"],
                 "aliases": d["aliases"],
                 "text": d["text"],
+                "text_sha256": _sha256(d["text"]),
             }
         )
         g.defines.append({"unit": _node(d["unit_id"]), "definition": _node(d["node_id"])})
@@ -351,8 +358,26 @@ def main() -> None:
     parser.add_argument("--processed-dir", type=Path, default=Path("data/processed"))
     parser.add_argument("--review-dir", type=Path, default=Path("data/review"))
     parser.add_argument("--batch-size", type=int, default=500)
+    parser.add_argument(
+        "--export-structure",
+        type=Path,
+        metavar="PATH",
+        help="write the text-free structure, no load",
+    )
+    parser.add_argument(
+        "--from-structure", type=Path, metavar="PATH", help="load a text-less graph from PATH"
+    )
     args = parser.parse_args()
-    g = read_graph(args.processed_dir / args.source, args.review_dir / args.source)
+    from pdp_ingest.graph_structure import read_structure, write_structure
+
+    if args.from_structure:
+        g = read_structure(args.from_structure)
+    else:
+        g = read_graph(args.processed_dir / args.source, args.review_dir / args.source)
+    if args.export_structure:
+        write_structure(g, args.export_structure)
+        print(f"structure {args.source}: {args.export_structure}")
+        return
     expected = g.counts()
     with connect() as driver:
         start = time.perf_counter()

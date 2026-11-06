@@ -66,6 +66,9 @@ jobs:
       - name: Start core stores (M0.2)
         run: make up
 
+      - name: Start the Neo4j test instance (M1.5)
+        run: make up-test
+
       - name: Migrations apply, then re-apply as a no-op (M0.6)
         run: make migrate && make migrate
 
@@ -74,7 +77,7 @@ jobs:
 
       - name: Store logs on failure
         if: failure()
-        run: docker compose --project-directory . -f deploy/compose/compose.yaml --profile core logs --tail 200
+        run: docker compose --project-directory . -f deploy/compose/compose.yaml --profile core --profile test logs --tail 200
 
       - name: Tear down
         if: always()

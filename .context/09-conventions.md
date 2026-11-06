@@ -39,6 +39,7 @@
 | Snapshot | Ingestion outputs on the real UU 27/2022 source (counts, sampled texts) | `snapshot` |
 | Contract | Backend adapters vs mock OpenAI-compatible servers; OpenAPI schema snapshot | default |
 | Integration | API ↔ DBs via compose/testcontainers, LLM via cassettes | `integration` |
+| Corpus | Exact law-text assertions on the git-ignored `data/processed/` (local only, skip without it) | `needs_corpus` |
 | Eval smoke | 30-item replay eval | `eval_smoke` |
 | Load/chaos | Locust, fault proxy, `mock` profile — manual | not in CI |
 

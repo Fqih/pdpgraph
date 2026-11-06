@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The UU 27/2022 graph against its artifacts, and canonical queries with hand-checked cases
-(M1.5, FR-PDP-06).
+"""The UU 27/2022 graph: ids, structure and canonical queries with hand-checked cases (M1.5,
+FR-PDP-06). Runs in CI.
 
-Needs `make up` and the stage artifacts of `make ingest SOURCE=uu27-2022` (git-ignored, so the
-tests skip without them). Loading is idempotent, so the tests (re)load the source first.
+Built from the committed text-free structure artifact `tests/fixtures/uu27-2022/structure.json`
+(text-less graph mode) in the Neo4j test instance. Text assertions are in
+`test_graph_uu27_corpus.py` (local only); `test_structure_uu27.py` keeps the artifact current.
 """
 
-from collections.abc import Iterator
 from datetime import date
 from pathlib import Path
 
@@ -14,26 +14,22 @@ import pytest
 from neo4j import Driver
 
 from pdp_core.graph import (
+    Explanation,
     VersionError,
-    connect,
     context_of,
     definitions_for,
     expand_references,
     version_at,
 )
-from pdp_ingest.graph_load import ARTIFACTS, GraphData, graph_counts, load, read_graph
+from pdp_ingest.graph_load import GraphData, graph_counts, load
+from pdp_ingest.graph_structure import read_structure
 
 pytestmark = pytest.mark.integration
 
 ROOT = Path(__file__).resolve().parents[2]
 S = "uu27-2022"
-PROCESSED = ROOT / "data" / "processed" / S
+STRUCTURE = ROOT / "tests" / "fixtures" / S / "structure.json"
 DAY = date(2025, 1, 1)
-
-if not all((PROCESSED / name).is_file() for name in ARTIFACTS):
-    pytest.skip(
-        f"no stage artifacts in {PROCESSED}; run `make ingest SOURCE={S}`", allow_module_level=True
-    )
 
 
 def _n(*suffixes: str) -> tuple[str, ...]:
@@ -42,14 +38,13 @@ def _n(*suffixes: str) -> tuple[str, ...]:
 
 @pytest.fixture(scope="module")
 def data() -> GraphData:
-    return read_graph(PROCESSED, ROOT / "data" / "review" / S)
+    return read_structure(STRUCTURE)
 
 
 @pytest.fixture(scope="module")
-def driver(data: GraphData) -> Iterator[Driver]:
-    with connect() as d:
-        load(d, data)
-        yield d
+def driver(graph_driver: Driver, data: GraphData) -> Driver:
+    load(graph_driver, data)
+    return graph_driver
 
 
 def test_graph_counts_equal_artifact_counts(driver: Driver, data: GraphData) -> None:
@@ -57,6 +52,15 @@ def test_graph_counts_equal_artifact_counts(driver: Driver, data: GraphData) -> 
     actual = graph_counts(driver, S)
     wrong = {k: (v, actual.get(k)) for k, v in expected.items() if actual.get(k) != v}
     assert not wrong, f"count mismatch (expected, graph): {wrong}"
+
+
+def test_units_are_text_less_with_hashes(driver: Driver) -> None:
+    records, _, _ = driver.execute_query(
+        "MATCH (u:LegalUnit)-[:IN_SOURCE]->(:Source {source_id: $s}) "
+        "RETURN count(u.text) AS texts, count(u.text_sha256) AS hashes, count(u) AS units",
+        s=S,
+    )
+    assert records[0].data() == {"texts": 0, "hashes": 519, "units": 519}
 
 
 def test_counts_match_the_measured_source(data: GraphData) -> None:
@@ -88,14 +92,14 @@ def test_expand_references_from_pasal_14_range(driver: Driver) -> None:
 
 
 def test_definitions_for_unit_using_pengendali(driver: Driver) -> None:
-    got = [
-        (u.term, u.defined_by, u.count) for u in definitions_for(driver, list(_n("p40/a1")), DAY)
-    ]
+    uses = definitions_for(driver, list(_n("p40/a1")), DAY)
+    got = [(u.definition, u.defined_by, u.count) for u in uses]
     assert got == [
-        ("Data Pribadi", f"{S}/p1/n1@1", 2),
-        ("Pengendali Data Pribadi", f"{S}/p1/n4@1", 1),
-        ("Subjek Data Pribadi", f"{S}/p1/n6@1", 1),
+        (f"{S}/def/data-pribadi@1", f"{S}/p1/n1@1", 2),
+        (f"{S}/def/pengendali-data-pribadi@1", f"{S}/p1/n4@1", 1),
+        (f"{S}/def/subjek-data-pribadi@1", f"{S}/p1/n6@1", 1),
     ]
+    assert all(u.term is None for u in uses)  # text-less graph
 
 
 def test_context_of_pasal_20_2(driver: Driver) -> None:
@@ -103,7 +107,9 @@ def test_context_of_pasal_20_2(driver: Driver) -> None:
     assert ctx.pasal == f"{S}/p20@1"
     assert ctx.siblings == _n("p20/a1")
     # Pasal 20 ayat (2) has no Penjelasan of its own; its huruf do
-    assert ctx.penjelasan == _n(*(f"p20/a2/h{x}#pj" for x in "abcdef"))
+    assert ctx.penjelasan == tuple(
+        Explanation(n, "descendant_explanation") for n in _n(*(f"p20/a2/h{x}#pj" for x in "abcdef"))
+    )
 
 
 def test_version_at_returns_exactly_one(driver: Driver) -> None:

@@ -2,7 +2,7 @@
 # Compose stack (03 §7). Run via the Makefile so `.env` at the repo root is used:
 #   docker compose --project-directory . -f deploy/compose/compose.yaml --profile core up -d
 #
-# Profile `core` = stores only (M0.2); `local-llm` = models-aux (M0.4; llama.cpp T1 in M2.9).
+# Profile `core` = stores only (M0.2); `test` = throwaway Neo4j for integration tests (M1.5); `local-llm` = models-aux (M0.4; llama.cpp T1 in M2.9).
 # App, mock, and obs services are added by the tasks that need them. Store ports are published on 127.0.0.1 only (SEC-15); containers run
 # as non-root with no extra privileges. Memory limits follow the 16 GB budget in 03 §7 [TUNE].
 # Images are pinned by tag and digest (SEC-13).
@@ -31,6 +31,30 @@ services:
     volumes:
       - neo4j-data:/data
     mem_limit: 2g
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p \"$${NEO4J_AUTH#neo4j/}\" 'RETURN 1' >/dev/null"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+
+  # Throwaway graph for integration tests (M1.5): own loopback port, tmpfs storage, never the dev
+  # graph. Tests wipe it per session and refuse to run against port 7687.
+  neo4j-test:
+    <<: *hardening
+    profiles: [test]
+    image: neo4j:5.26.32-community@sha256:249a1ec6e3c52d82101a5ed33d6ed2b5ed5b0017b21a28c0bfebc335e87fb177
+    user: "7474:7474"
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:?set NEO4J_PASSWORD in .env (min 8 chars)}
+      NEO4J_server_memory_heap_initial__size: 512M
+      NEO4J_server_memory_heap_max__size: 512M
+      NEO4J_server_memory_pagecache_size: 128M
+    ports:
+      - "127.0.0.1:7688:7687"
+    tmpfs:
+      - /data:uid=7474,gid=7474
+    mem_limit: 1g
     healthcheck:
       test: ["CMD-SHELL", "cypher-shell -u neo4j -p \"$${NEO4J_AUTH#neo4j/}\" 'RETURN 1' >/dev/null"]
       interval: 10s
