@@ -131,7 +131,7 @@ Stages are idempotent; each writes an artifact under `data/processed/<source_id>
 | `refs` | Text → reference mentions via regex grammar (Pasal X, ayat (Y), huruf z, lists, ranges, "Undang-Undang ini", external laws, delegation phrases) → resolved targets (04 §3.7) | Yes; unresolved logged in `data/review/<id>/refs.md` |
 | `defs` | Definitional Pasal → `Definition` nodes (term, aliases, text). Term matcher links usages longest-first: matches with the term's own capitalization are `USES_TERM`; lowercase matches are logged as `informal` (no edge). Also derives the candidate `DataCategory` vocabulary from the classification Pasal (04 §3.8) | Yes; listed in `data/review/<id>/definitions.md` |
 | `obligations` | Paragraph text → `Obligation` candidates via LLM (Tierline, data class `public`, guided JSON) → validation → review queue | LLM + schema |
-| `load_graph` | All artifacts → Neo4j (MERGE on IDs; transactional) | Yes |
+| `load_graph` | Stage artifacts → Neo4j (MERGE on IDs, properties replaced, batched transactions; graph counts checked against artifact counts; 04 §3.9) | Yes |
 | `index` | Paragraph units → OpenSearch docs (text, Penjelasan, ancestors, validity, embedding) | Yes |
 | `snapshot` | Golden snapshot tests: node counts, specific article texts, reference counts | Yes |
 

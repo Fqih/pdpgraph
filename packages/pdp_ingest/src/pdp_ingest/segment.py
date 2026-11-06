@@ -22,6 +22,7 @@ from dataclasses import dataclass, field, replace
 from common import ids
 from pdp_ingest.canonical import Block
 
+VERSION = 1  # bump when the stage output changes; recorded on the :Source node
 _ROMAN = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100}
 _ORDINALS = {
     w: n

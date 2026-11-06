@@ -11,6 +11,8 @@ Artifacts under `data/processed/<source_id>/`:
 - `defs.jsonl`, `term_uses.jsonl`, `terms.json`, `data_categories.jsonl`: definitions, defined and
   informal term uses per unit, the protected-terms list (M1.6) and candidate data categories
   (`defs.py`);
+- `source.json`, `structures.jsonl`: run provenance and the BAB/Bagian/Paragraf structures, read
+  with the other graph artifacts by `load_graph` (`graph_load.py`, M1.5);
 - `crosscheck.jsonl`: one finding per unit against the reference PDF.
 
 The owner's review lists go to `data/review/<source_id>/`: `crosscheck.md` (`review.py`),
@@ -20,10 +22,11 @@ The owner's review lists go to `data/review/<source_id>/`: `crosscheck.md` (`rev
 import json
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
+from importlib.metadata import version
 from pathlib import Path
 from typing import Any
 
-from pdp_ingest.canonical import Block, blocks
+from pdp_ingest.canonical import CANONICALIZATION_VERSION, Block, blocks
 from pdp_ingest.crosscheck import Finding, crosscheck, pdf_pages
 from pdp_ingest.defs import (
     CLASSIFICATION_PASAL,
@@ -35,11 +38,14 @@ from pdp_ingest.defs import (
     link_terms,
     term_list,
 )
+from pdp_ingest.defs import VERSION as DEFS_VERSION
 from pdp_ingest.fetch import element_inner_html, load_verified
-from pdp_ingest.overrides import Override, apply_overrides, load_overrides
+from pdp_ingest.overrides import Override, apply_overrides, counts, load_overrides
+from pdp_ingest.refs import VERSION as REFS_VERSION
 from pdp_ingest.refs import Mention, extract_refs
 from pdp_ingest.registry import SourceEntry
-from pdp_ingest.segment import Segmented, Unit, segment
+from pdp_ingest.segment import VERSION as SEGMENT_VERSION
+from pdp_ingest.segment import Segmented, Structure, Unit, segment
 
 
 @dataclass(frozen=True)
@@ -122,27 +128,77 @@ def run_text_stages(
             [{"type": "structure", **asdict(s)} for s in segmented.structures]
             + [{"type": "unit", **asdict(u)} for u in segmented.units],
         )
-        _write_jsonl(out / "units.jsonl", (asdict(u) for u in units))
-        _write_jsonl(out / "refs.jsonl", (asdict(m) for m in mentions))
-        _write_jsonl(
-            out / "defs.jsonl", (asdict(d) | {"term_norm": d.term_norm} for d in definitions)
-        )
-        _write_jsonl(
-            out / "term_uses.jsonl",
-            (
-                asdict(u)
-                | {
-                    "confidence": u.confidence,
-                    "nested_in_informal": u.nested_in_informal,
-                    "ambiguous_case": u.ambiguous_case,
-                }
-                for u in uses
-            ),
+        write_graph_artifacts(
+            out,
+            source_manifest(entry, overrides),
+            segmented.structures,
+            units,
+            mentions,
+            definitions,
+            uses,
+            categories,
         )
         (out / "terms.json").write_text(
             json.dumps(term_list(definitions), ensure_ascii=False, indent=1) + "\n",
             encoding="utf-8",
         )
-        _write_jsonl(out / "data_categories.jsonl", (asdict(c) for c in categories))
         _write_jsonl(out / "crosscheck.jsonl", (asdict(f) for f in findings))
     return result
+
+
+def source_manifest(entry: SourceEntry, overrides: list[Override]) -> dict[str, Any]:
+    """Provenance of a run (`source.json`): registry fields, body hash, stage versions."""
+    total, unconfirmed = counts(overrides)
+    return {
+        "source_id": entry.source_id,
+        "title": entry.title,
+        "instrument_type": entry.instrument_type,
+        "number": entry.number,
+        "year": entry.year,
+        "enacted_on": str(entry.enacted_on),
+        "promulgated_on": str(entry.promulgated_on),
+        "effective_from": str(entry.effective_from),
+        "url": str(entry.primary.url),
+        "body_sha256": entry.primary.body_sha256,
+        "canonicalization_version": CANONICALIZATION_VERSION,
+        "parser_version": f"pdp_ingest@{version('pdp-ingest')}",
+        "segment_version": SEGMENT_VERSION,
+        "refs_version": REFS_VERSION,
+        "defs_version": DEFS_VERSION,
+        "overrides_total": total,
+        "overrides_unconfirmed": unconfirmed,
+    }
+
+
+def write_graph_artifacts(
+    out: Path,
+    source: dict[str, Any],
+    structures: list[Structure],
+    units: list[Unit],
+    mentions: list[Mention],
+    definitions: list[Definition],
+    uses: list[TermUse],
+    categories: list[DataCategory],
+) -> None:
+    """The artifacts `load_graph` reads (M1.5): everything the graph holds, nothing re-parsed."""
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "source.json").write_text(
+        json.dumps(source, ensure_ascii=False, indent=1) + "\n", encoding="utf-8"
+    )
+    _write_jsonl(out / "structures.jsonl", (asdict(s) for s in structures))
+    _write_jsonl(out / "units.jsonl", (asdict(u) for u in units))
+    _write_jsonl(out / "refs.jsonl", (asdict(m) for m in mentions))
+    _write_jsonl(out / "defs.jsonl", (asdict(d) | {"term_norm": d.term_norm} for d in definitions))
+    _write_jsonl(
+        out / "term_uses.jsonl",
+        (
+            asdict(u)
+            | {
+                "confidence": u.confidence,
+                "nested_in_informal": u.nested_in_informal,
+                "ambiguous_case": u.ambiguous_case,
+            }
+            for u in uses
+        ),
+    )
+    _write_jsonl(out / "data_categories.jsonl", (asdict(c) for c in categories))

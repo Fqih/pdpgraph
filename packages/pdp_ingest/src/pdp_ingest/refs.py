@@ -29,6 +29,7 @@ from typing import NamedTuple
 from common import ids
 from pdp_ingest.segment import Unit, _label
 
+VERSION = 1  # bump when the stage output changes; recorded on the :Source node
 _ITEM = re.compile(
     r"(?:Pasal\s+(?P<pasal>\d+)(?P<psuf>[A-Z]?)\b)?"
     r"(?:\s*ayat\s+\((?P<ayat>\d+)(?P<asuf>[a-z]?)\))?"
