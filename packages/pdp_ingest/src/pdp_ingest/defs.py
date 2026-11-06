@@ -38,6 +38,7 @@ from common import ids
 from pdp_ingest.refs import Mention
 from pdp_ingest.segment import Unit
 
+VERSION = 1  # bump when the stage output changes; recorded on the :Source node
 _DEFINITION = re.compile(
     r"(?P<term>.+?)(?: yang selanjutnya (?:disebut|disingkat) (?P<alias>.+?))? adalah \S",
     re.DOTALL,

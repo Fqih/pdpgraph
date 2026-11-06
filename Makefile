@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help sync lint fmt check test cov migrate test-int eval-smoke eval-record up down up-llm up-mock up-obs ingest models-download test-models test-snapshot
+.PHONY: help sync lint fmt check test cov migrate test-int eval-smoke eval-record up down up-llm up-mock up-obs ingest models-download test-models test-snapshot load-graph
 
 UV := uv run --frozen
 COMPOSE := docker compose --project-directory . -f deploy/compose/compose.yaml
@@ -60,6 +60,10 @@ up-llm: .env ## Compose core + local-llm (models-aux; llama.cpp T1 lands in M2.9
 ingest: .env ## Ingest a source, e.g. make ingest SOURCE=uu27-2022 (stages so far: fetch..defs, crosscheck; needs make up)
 	@test -n "$(SOURCE)" || { echo "usage: make ingest SOURCE=<source_id>" >&2; exit 1; }
 	$(UV) python -m pdp_ingest --source $(SOURCE)
+
+load-graph: .env ## Load a source's stage artifacts into Neo4j, e.g. make load-graph SOURCE=uu27-2022 (needs make ingest, make up)
+	@test -n "$(SOURCE)" || { echo "usage: make load-graph SOURCE=<source_id>" >&2; exit 1; }
+	$(UV) python -m pdp_ingest.graph_load --source $(SOURCE)
 
 # Targets below land in later roadmap tasks; they fail loudly until then.
 

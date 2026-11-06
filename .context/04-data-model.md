@@ -88,13 +88,13 @@ Rules:
 
 | Label | Key properties | Notes |
 |---|---|---|
-| `:Source` | `source_id`, `title`, `instrument_type`, `year`, `effective_from` | |
+| `:Source` | `source_id`, `title`, `instrument_type`, `number`, `year`, `enacted_on`, `promulgated_on`, `effective_from`, `url`, `body_sha256`, `canonicalization_version`, `parser_version`, `segment_version`, `refs_version`, `defs_version`, `overrides_total`, `overrides_unconfirmed` | Provenance of the loaded artifacts (`source.json`, §3.9) |
 | `:Structure` | `node_id`, `unit_id`, `kind ∈ {BAB, BAGIAN, PARAGRAF}`, `number`, `heading` | Grouping only, not citable |
 | `:LegalUnit` | `node_id`, `unit_id`, `kind ∈ {PASAL, AYAT, HURUF, ANGKA, PENJELASAN}`, `text`, `text_norm`, `label`, `valid_from`, `valid_to` (null = open), `version`, `order` | **Citable** units |
-| `:Definition` | `node_id`, `term`, `term_norm`, `aliases[]`, `text` | From definitional articles |
+| `:Definition` | `node_id` (`<source>/def/<slug>@1`), `term`, `term_norm`, `aliases[]`, `text` | From definitional articles. The artifacts' `node_id` is the versionless id; the graph appends `@<version>` (§2) |
 | `:Obligation` | `node_id`, `actor_role`, `action`, `object`, `condition`, `deadline`, `modality ∈ {WAJIB, DILARANG, DAPAT}`, `review_status ∈ {PENDING, APPROVED, REJECTED}` | Extracted; only `APPROVED` used online |
 | `:Actor` | `name ∈ {PENGENDALI, PROSESOR, SUBJEK_DATA, LEMBAGA, DPO, PIHAK_KETIGA, ...}` | Controlled vocabulary |
-| `:DataCategory` | `code`, `label`, `unit_id`, `parent_code`, `open`, `status ∈ {proposed, confirmed}` | Derived from Pasal 4 (§3.8): classes `SPESIFIK`, `UMUM`; members `KESEHATAN`, `BIOMETRIK`, `GENETIKA`, `CATATAN_KEJAHATAN`, `ANAK`, `KEUANGAN_PRIBADI`, `LAINNYA` (open) under `SPESIFIK`; `NAMA_LENGKAP`, `JENIS_KELAMIN`, `KEWARGANEGARAAN`, `AGAMA`, `STATUS_PERKAWINAN`, `DIKOMBINASIKAN_UNTUK_MENGIDENTIFIKASI_SESEORANG` under `UMUM`. All `proposed` until the owner confirms them. `SPESIFIK` and `UMUM` are parent nodes; members link to them with `SUBCATEGORY_OF`. `LAINNYA` is open-ended (03 §5.3: unmappable categories give `UNKNOWN`) |
+| `:DataCategory` | `source_id` + `code` (key), `label`, `unit_id`, `open`, `explanation`, `status ∈ {proposed, confirmed}` | Derived from Pasal 4 (§3.8): classes `SPESIFIK`, `UMUM`; members `KESEHATAN`, `BIOMETRIK`, `GENETIKA`, `CATATAN_KEJAHATAN`, `ANAK`, `KEUANGAN_PRIBADI`, `LAINNYA` (open) under `SPESIFIK`; `NAMA_LENGKAP`, `JENIS_KELAMIN`, `KEWARGANEGARAAN`, `AGAMA`, `STATUS_PERKAWINAN`, `DIKOMBINASIKAN_UNTUK_MENGIDENTIFIKASI_SESEORANG` under `UMUM`. All `proposed` until the owner confirms them. `SPESIFIK` and `UMUM` are parent nodes; members link to them with `SUBCATEGORY_OF`. `LAINNYA` is open-ended (03 §5.3: unmappable categories give `UNKNOWN`) |
 | `:Sanction` | `node_id`, `type ∈ {ADMINISTRATIVE, CRIMINAL}`, `description` | |
 | `:Concept` | `code` (e.g., `LEGAL_BASIS`, `CONSENT`, `BREACH_NOTIFICATION`, `CROSS_BORDER_TRANSFER`, `DPO`, `DPIA`, `RETENTION`) | Topic tags for routing gap analysis |
 
@@ -104,10 +104,10 @@ Rules:
 |---|---|---|
 | `PART_OF` | `LegalUnit`/`Structure` → parent | `order` |
 | `IN_SOURCE` | any → `Source` | |
-| `REFERENCES` | `LegalUnit` → `LegalUnit` | `mention_text`, `resolution ∈ {EXACT, PARENT, EXTERNAL_UNRESOLVED}` |
+| `REFERENCES` | `LegalUnit` → `LegalUnit` | `mention_text`, `resolution ∈ {EXACT, PARENT, EXTERNAL_UNRESOLVED}`, `start`, `end` (mention span in the source unit's text; one edge per mention and target) |
 | `EXPLAINED_BY` | `LegalUnit` → `LegalUnit{kind:PENJELASAN}` | |
 | `DEFINES` | `LegalUnit` → `Definition` | |
-| `USES_TERM` | `LegalUnit` → `Definition` | `count` (defined uses only, §3.8) |
+| `USES_TERM` | `LegalUnit` → `Definition` | `count`, `informal_count`, `nested_in_informal`, `ambiguous_case` (defined uses only, §3.8) |
 | `SUPERSEDES` | newer `LegalUnit` → older `LegalUnit` | `effective_on`, `by_source_id` |
 | `MODIFIES_READING` | `Source{instrument_type: PUTUSAN_MK}` → `LegalUnit` | `effective_on`, `holding_summary`, `operative_text_quote` (verbatim, citable quote from the ruling), `status ∈ {CONDITIONALLY_UNCONSTITUTIONAL, UNCONSTITUTIONAL, OTHER}` (§3.5, ADR-017) |
 | `AMENDS` | `Source` (amending instrument) → `LegalUnit` | `effective_on`, `lampiran_ref`, `operative_text_quote` (verbatim, citable) (§3.6, ADR-019) |
@@ -200,6 +200,54 @@ The owner's review list is `data/review/<source_id>/definitions.md`. Its `Review
 - per category: `confirmed`, `code_change` or `not_a_category`.
 
 Only confirmed codes are used downstream.
+
+### 3.9 Loading (`load_graph`, M1.5)
+
+`python -m pdp_ingest.graph_load --source <id>` (`make load-graph SOURCE=<id>`) reads only these files:
+- the stage artifacts in `data/processed/<id>/`: `source.json`, `structures.jsonl`, `units.jsonl`, `refs.jsonl`, `defs.jsonl`, `term_uses.jsonl`, `data_categories.jsonl`;
+- the category verdicts in `data/review/<id>/definitions.md`.
+
+Nothing is re-parsed.
+
+**Write rules**
+- The §3.3 constraints are created first, with `IF NOT EXISTS`.
+- Every node is `MERGE`d on its key and its properties are replaced with `SET n = row`:
+  - `node_id` for Structure, LegalUnit and Definition;
+  - `source_id` for Source;
+  - `source_id` + `code` for DataCategory.
+- Edges are `MERGE`d on their endpoints; `REFERENCES` is also keyed on `start`.
+- Writes go in batched write transactions (500 rows by default). A re-run gives identical nodes, edges and properties.
+
+**Node rules**
+- Every unit is version 1: `node_id = unit_id@1`, `valid_from = Source.effective_from`, no `valid_to` (open; Neo4j stores no nulls).
+- `text_norm` is the text NFC-normalized, lowercased, with whitespace collapsed.
+
+**Edge rules**
+- `PART_OF {order}`: body units point to their parent unit or structure; Bagian/Paragraf point to their parent structure. Penjelasan units have no `PART_OF`.
+- `EXPLAINED_BY`: the explained unit points to its Penjelasan; `pj-umum` has no edge.
+- `IN_SOURCE`: from every node to its Source.
+- `REFERENCES`: one per internal target of a `REFERENCE` mention.
+- `DEFINES`, `SUBCATEGORY_OF`.
+- `USES_TERM`: defined uses only. A unit with only informal matches for a term has no edge; those matches stay in `term_uses.jsonl`.
+- Delegations, `SELF` and external mentions create no edge.
+
+**Category status**
+- `confirmed` when the owner's verdict is `confirmed`, else `proposed`.
+
+**Consistency check**
+- The CLI and the integration test compare graph counts with the artifact counts per label and edge type, and fail naming every mismatch.
+
+**Canonical query contracts (§3.4, `pdp_core/graph/queries.py`)**
+- `expand_references`: returns paths of up to `max_hops` (1..5), shortest first, then in document order.
+- `context_of`: returns
+  - the unit's Pasal;
+  - its siblings (same kind, same parent);
+  - the Penjelasan units of the unit, its ancestors up to the Pasal, and its descendants.
+- `version_at`: raises unless exactly one version is valid.
+- `candidate_obligations`:
+  - takes approved obligations of the actor whose units are valid at `as_of`;
+  - keeps unconditional ones, and those triggered by a given confirmed category, its parent class, or a given concept;
+  - returns separately the categories with no confirmed code or with an open-ended one, which give `UNKNOWN` (03 §5.3).
 
 ## 4. Search index (OpenSearch)
 

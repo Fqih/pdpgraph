@@ -7,7 +7,7 @@ Claude Code updates this file at the end of every session. Newest entry on top o
 | Field | Value |
 |---|---|
 | Phase | 1 — PDPGraph MVP (week 1) |
-| Current task | M1.5 load_graph (after the M1.4 link-flags PR #24) |
+| Current task | M1.5 done (PR #25); next per 08: M1.6 |
 | Last updated | 2026-11-05 |
 | Release | none |
 
@@ -21,6 +21,7 @@ Claude Code updates this file at the end of every session. Newest entry on top o
 | M0.4 | done (PR #11) | models-aux fp32 CPU: `/embed`, `/rerank`, `/nli`, dynamic batching; pinned revisions in `configs/models_aux.yaml`; compose `local-llm`; offline runtime |
 | M0.5 | done (PR #8) | `common/llm/`: async `LLMClient`, cassettes (replay/record/live), `UsageLimiter`, one span per call |
 | M0.6 | done (PR #6) | Alembic `0001_initial` = 04 §6 SQL verbatim; `make migrate` idempotent; upgrade/downgrade/re-upgrade tested |
+| M1.5 | done (PR #25) | `load_graph` (`pdp_ingest/graph_load.py`) + `pdp_core/graph` (constraints, canonical queries); 568 nodes, 1661 edges for UU 27/2022; counts equal artifacts |
 | M1.4 link flags | done (PR #24) | `nested_in_informal` / `ambiguous_case` on defined links; term sample rebuilt with those quotas (unlabeled); DataCategory modeling + UNKNOWN rule documented |
 | M1.4 | done (PR #23) | `defs` stage: 11 definitions (1 alias), 400 USES_TERM links, 15 informal, 15 DataCategory candidates (proposed); review list + 40-item link sample built, labels pending |
 | M1.3 label protocol | done (PR #22) | label all 114 mentions (stratified 50 first), targeted + random negatives, overlapping slices, Wilson 95% intervals; set rebuilt (unlabeled) |
@@ -67,6 +68,8 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 | 2026-11-05 | UU 27/2022 definitions and term uses (M1.4) | 11 definitions (Pemerintah Pusat has alias Pemerintah); defined uses: 400 unit-term links, 490 occurrences (Data Pribadi 208, Pengendali Data Pribadi 83, Subjek Data Pribadi 65, Pelindungan Data Pribadi 62); informal: 15 links, 21 occurrences; 15 DataCategory candidates (2 classes, 7 specific, 6 general) | `make ingest`, `data/processed/uu27-2022/term_uses.jsonl` |
 | 2026-11-06 | Term-link flags (M1.4) | defined links with a nested occurrence: 1 of 400 (Data Pribadi in Pasal 1 angka 2); with a sentence-initial occurrence: 69 of 400 | `make ingest`, `term_uses.jsonl` |
 | 2026-11-06 | Term-link label set (M1.4, 06 §2.10, rebuilt in PR #24), seed 20261105 | 40 items: 30 of 400 defined links (11 terms; 1 of 1 nested, 12 of 69 ambiguous_case), 10 of 15 informal (7 terms). Link precision: not yet measured (labels pending) | `python -m pdp_eval terms-sample` |
+| 2026-11-06 | UU 27/2022 graph (M1.5) | 568 nodes (Source 1, Structure 22: BAB 16 + Bagian 6, LegalUnit 519, Definition 11, DataCategory 15) and 1661 edges (PART_OF 361, IN_SOURCE 567, EXPLAINED_BY 163, REFERENCES 146, DEFINES 11, USES_TERM 400, SUBCATEGORY_OF 13); graph counts equal artifact counts | `make load-graph SOURCE=uu27-2022` |
+| 2026-11-06 | load_graph time (M1.5), Neo4j 5.26 community in compose, laptop Ryzen 7 PRO 4750U (16 threads), batch 500 | fresh load (source subgraph removed first, constraints existing): 0.58 s, 0.37 s, 0.80 s over 3 runs; first-ever load incl. constraint creation: 2.07 s; re-run on a loaded graph: 0.27 to 0.51 s | `python -m pdp_ingest.graph_load` |
 
 ## Follow-ups discovered
 
@@ -105,6 +108,8 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 - **M1.4 → owner:**
   - Review `data/review/uu27-2022/definitions.md`: 11 definitions (term and text against the PDF; the page is shown) and 15 DataCategory codes (`confirmed` / `code_change` / `not_a_category`).
   - Label `evals/datasets/pdp-terms/v0/sample.jsonl` with `uv run python -m pdp_eval terms-label`, then run `terms-report --out evals/reports/<date>-pdp-terms-<sha>/report.md`.
+- **M1.5 real-graph tests in CI:** `tests/integration/test_graph_uu27.py` skips without the git-ignored stage artifacts, so CI runs only the synthetic fixture graph. Committing `data/processed/uu27-2022/` would let CI run it, but that redistributes the law text, which depends on the open [VERIFY] question on redistribution terms. Owner decides.
+- **M1.5 `candidate_obligations`:** implemented and tested on hand-made Obligation nodes in the fixture. No Obligation nodes are loaded until the obligation-extraction task.
 - **M1.4 nested quota:** the owner asked for at least 3 nested links in the sample; UU 27/2022 has only 1, which is included. More come with later sources.
 - **M1.10/M1.11 Penjelasan glosses:** "Yang dimaksud dengan "x" adalah ..." glosses (37 occurrences in UU 27/2022) may serve as retrieval hints only (query expansion, reranker features). They are never cited as the law's definitions and never become `Definition` nodes.
 - **M1.4 linker scope:**
@@ -169,6 +174,7 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 | 2026-11-05 | M1.2 stage artifacts: `extract.jsonl`, `segment.jsonl` (before overrides), `units.jsonl` (overrides applied; input of later stages), `crosscheck.jsonl`. The owner's review list is committed at `data/review/<source_id>/crosscheck.md` (03 §8 tree updated). Overrides are exact single-occurrence text replacements; a stale entry fails the run | M1.2, FR-PDP-01 |
 | 2026-11-05 | M1.2 safeguards (owner): unconfirmed overrides stay applied, but the `sources` row (new columns, migration 0002, 04 §6) and every eval report record `overrides_total`/`overrides_unconfirmed`; 08 v0.1 exit gate requires `overrides_unconfirmed = 0`. Overrides gain `changes_meaning` (4 set). `crosscheck.md` follows the owner's review order (meaning-changing overrides + Pasal 26(2), other 27 overrides, 10 snapshot units, 83 flagged units worst-first); each snapshot/flagged unit has a `Review: reviewed_by: <name> \| verdict: komdigi_ok\|override_needed\|ocr_noise` line that regeneration keeps | M1.2 |
 | 2026-11-05 | M1.3 (owner): one mention per reference chain with char span, raw text, resolution and explicit range expansion; delegation phrases are mention kind DELEGATION with no graph edge yet; "Undang-Undang ini" is SELF; external instruments EXTERNAL_UNRESOLVED with the instrument kept; Penjelasan refs resolve relative to the explained unit (04 §3.7). Resolver evaluated on an owner-labeled 50+20 sample at target level, recall ≥ 95% / precision ≥ 98% [TARGET] (06 §2.9) | M1.3, FR-PDP-03 |
+| 2026-11-06 | M1.5 (owner): load from stage artifacts only, idempotent MERGE in batched transactions; version-1 validity from `effective_from`; edges per 04 §3.2 with REFERENCES span and USES_TERM flags; Source provenance; consistency test; canonical queries on fixture and real graph. DataCategory nodes keyed by `source_id` + `code` so sources and test fixtures never share a category node | M1.5, FR-PDP-06 |
 | 2026-11-06 | M1.4 interpretation (owner):
 - definition units link other terms (no self-link);
 - a defined match inside an informal one is kept and flagged `nested_in_informal`;
@@ -182,6 +188,17 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 | 2026-11-05 | ADR-019: amendments are separate sources linked by `AMENDS`; consolidated text is `derived: true`, for retrieval only, never cited alone; KUHP 613(3) left as an open question. Implementation M4.4 | ADR-019 |
 
 ## Session log
+
+### 2026-11-06 — M1.4 link flags (PR #24) + M1.5 load_graph
+- PR #24: `nested_in_informal` / `ambiguous_case` flags, term sample rebuilt with quotas, DataCategory modeling and the UNKNOWN rule documented.
+- M1.5:
+  - `pdp_core/graph` (`constraints.cypher` = 04 §3.3, `queries.cypher` + `queries.py` for the 04 §3.4 queries, `Neo4jSettings`);
+  - `pdp_ingest/graph_load.py` (artifacts to rows, batched MERGE load, count check);
+  - new artifacts `source.json` and `structures.jsonl`;
+  - stage `VERSION` constants;
+  - `make load-graph`;
+  - neo4j Python driver added to `pdp_core`.
+- Tests: 9 unit tests (rows from artifacts), 2 spec-sync tests, 9 fixture-graph integration tests (exact query results, re-run identical, UNKNOWN categories), 8 real-graph integration tests (counts, Pasal 57(1), Pasal 14, definitions for Pasal 40(1), context of Pasal 20(2), version_at, re-run identical).
 
 ### 2026-11-05 — M1.3 label protocol (PR #22) + M1.4 definitions
 - PR #22: label all 114 reference mentions, targeted + random negatives, overlapping slices, Wilson intervals (06 §2.9).
