@@ -10,7 +10,29 @@ from fastapi.testclient import TestClient
 def test_embed_shape(client: TestClient) -> None:
     r = client.post("/embed", json={"inputs": ["a", "bcd"], "kind": "passage"})
     assert r.status_code == 200
-    assert r.json() == {"model": "fake/embed", "dim": 2, "vectors": [[1.0, 1.0], [3.0, 1.0]]}
+    assert r.json() == {
+        "model": "fake/embed",
+        "revision": "f" * 40,
+        "dim": 2,
+        "vectors": [[1.0, 1.0], [3.0, 1.0]],
+    }
+
+
+def test_embed_multi_vector(client: TestClient, calls: dict[str, list[int]]) -> None:
+    r = client.post(
+        "/embed", json={"inputs": ["a", "bcd"], "kind": "passage", "multi_vector": True}
+    )
+    body = r.json()
+    assert body["vectors"] == [[1.0, 1.0], [3.0, 1.0]]
+    # one vector per token: the fake has one token per character
+    assert body["multi_vectors"] == [[[1.0, 0.0]], [[1.0, 0.0], [1.0, 0.0], [1.0, 0.0]]]
+    assert calls["embed_multi"] == [2]
+    assert "embed" not in calls
+
+
+def test_embed_without_multi_vector_has_no_multi_vectors(client: TestClient) -> None:
+    body = client.post("/embed", json={"inputs": ["a"], "kind": "query"}).json()
+    assert "multi_vectors" not in body
 
 
 def test_rerank_scores_follow_passage_order(client: TestClient) -> None:

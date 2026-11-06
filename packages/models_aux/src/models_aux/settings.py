@@ -4,7 +4,7 @@
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 from pydantic_settings import SettingsConfigDict
 
 from common.config import YamlSettings
@@ -20,6 +20,14 @@ class ModelSpec(BaseModel):
     license: str = Field(min_length=1)
     max_length: int = Field(gt=0)
     allow_patterns: list[str] = Field(min_length=1)
+    # file -> SHA-256 of files that are not safetensors; read without unpickling (ADR-020)
+    pinned_sha256: dict[str, Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]] = {}
+
+    @model_validator(mode="after")
+    def _pinned_are_fetched(self) -> "ModelSpec":
+        if missing := sorted(set(self.pinned_sha256) - set(self.allow_patterns)):
+            raise ValueError(f"pinned files not in allow_patterns: {missing}")
+        return self
 
 
 class ModelsAuxSettings(YamlSettings):

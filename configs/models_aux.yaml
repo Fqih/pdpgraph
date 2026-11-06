@@ -15,9 +15,13 @@ models:
     # 5617a9f6 (391 fp32 tensors); config and tokenizer files are identical (SEC-13).
     revision: 7b44caba5c06fd6f1ef1d2786261e636c38e4295
     license: MIT
-    # Dense vectors only (CLS pooling, L2-normalized); sparse/ColBERT heads are not used.
+    # Dense vectors (CLS pooling, L2-normalized) for retrieval. The ColBERT head gives
+    # multi-vectors on request (M1.6), cached for the M1.10 rerank experiment only; it is a
+    # pickled file, pinned by SHA-256 and read without unpickling (ADR-020). Sparse head unused.
     max_length: 512 # [TUNE] tokens; longer inputs are truncated
-    allow_patterns: [config.json, model.safetensors, tokenizer.json, tokenizer_config.json, special_tokens_map.json, sentencepiece.bpe.model]
+    allow_patterns: [config.json, model.safetensors, tokenizer.json, tokenizer_config.json, special_tokens_map.json, sentencepiece.bpe.model, colbert_linear.pt]
+    pinned_sha256:
+      colbert_linear.pt: 19bfbae397c2b7524158c919d0e9b19393c5639d098f0a66932c91ed8f5f9abb
   rerank:
     repo: BAAI/bge-reranker-v2-m3
     revision: 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e

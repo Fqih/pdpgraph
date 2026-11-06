@@ -21,10 +21,31 @@ def test_config_pins_three_models_by_commit_hash() -> None:
         assert spec.allow_patterns
 
 
-def test_only_safetensors_weights_are_fetched() -> None:
+def test_only_safetensors_weights_or_pinned_heads_are_fetched() -> None:
     for spec in ModelsAuxSettings().models.values():
         assert "model.safetensors" in spec.allow_patterns
-        assert not [p for p in spec.allow_patterns if p.endswith((".bin", ".pt", ".pth", ".pkl"))]
+        pickled = [p for p in spec.allow_patterns if p.endswith((".bin", ".pt", ".pth", ".pkl"))]
+        # a pickled file is fetched only when pinned by sha256 and read without unpickling
+        assert set(pickled) <= set(spec.pinned_sha256), pickled
+
+
+def test_bge_m3_colbert_head_is_pinned() -> None:
+    embed = ModelsAuxSettings().models["embed"]
+    assert embed.pinned_sha256 == {
+        "colbert_linear.pt": "19bfbae397c2b7524158c919d0e9b19393c5639d098f0a66932c91ed8f5f9abb"
+    }
+
+
+def test_pinned_file_must_be_fetched() -> None:
+    with pytest.raises(ValidationError, match="not in allow_patterns"):
+        ModelSpec(
+            repo="x/y",
+            revision="a" * 40,
+            license="MIT",
+            max_length=512,
+            allow_patterns=["model.safetensors"],
+            pinned_sha256={"head.pt": "b" * 64},
+        )
 
 
 @pytest.mark.parametrize("revision", ["main", "v1.0", "5617a9f", "Z" * 40])

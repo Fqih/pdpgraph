@@ -46,6 +46,17 @@ def test_embed_dims_norm_and_ranking(client: TestClient) -> None:
     assert _cos(qv, p["vectors"][0]) > _cos(qv, p["vectors"][1]) + 0.1
 
 
+def test_embed_multi_vector_tokens(client: TestClient) -> None:
+    plain = client.post("/embed", json={"inputs": [RELEVANT], "kind": "passage"}).json()
+    body = {"inputs": [RELEVANT, IRRELEVANT], "kind": "passage", "multi_vector": True}
+    r = client.post("/embed", json=body).json()
+    assert r["revision"] == "7b44caba5c06fd6f1ef1d2786261e636c38e4295"
+    assert math.isclose(_cos(r["vectors"][0], plain["vectors"][0]), 1.0, rel_tol=1e-5)
+    long, short = r["multi_vectors"]
+    assert len(long) > len(short) > 5  # one vector per token after CLS, padding dropped
+    assert all(len(v) == 1024 and math.isclose(_cos(v, v), 1.0, rel_tol=1e-4) for v in long)
+
+
 def test_rerank_scores_relevant_first(client: TestClient) -> None:
     r = client.post("/rerank", json={"query": QUERY, "passages": [IRRELEVANT, RELEVANT]}).json()
     assert r["model"] == "BAAI/bge-reranker-v2-m3"

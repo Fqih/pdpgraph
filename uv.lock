@@ -822,12 +822,14 @@ name = "pdp-core"
 version = "0.0.0"
 source = { editable = "packages/pdp_core" }
 dependencies = [
+    { name = "httpx" },
     { name = "neo4j" },
     { name = "pdpgraph-common" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "httpx", specifier = ">=0.28.1,<0.29" },
     { name = "neo4j", specifier = ">=5.28,<7" },
     { name = "pdpgraph-common", editable = "packages/common" },
 ]

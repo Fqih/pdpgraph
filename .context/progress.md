@@ -7,7 +7,7 @@ Claude Code updates this file at the end of every session. Newest entry on top o
 | Field | Value |
 |---|---|
 | Phase | 1 — PDPGraph MVP (week 1) |
-| Current task | M1.5 follow-up (CI structure graph, test isolation, context_of relations); next: M1.6 |
+| Current task | M1.6 in review (known-item queries await owner confirmation); next per 08: M1.7 |
 | Last updated | 2026-11-06 |
 | Release | none |
 
@@ -21,6 +21,8 @@ Claude Code updates this file at the end of every session. Newest entry on top o
 | M0.4 | done (PR #11) | models-aux fp32 CPU: `/embed`, `/rerank`, `/nli`, dynamic batching; pinned revisions in `configs/models_aux.yaml`; compose `local-llm`; offline runtime |
 | M0.5 | done (PR #8) | `common/llm/`: async `LLMClient`, cassettes (replay/record/live), `UsageLimiter`, one span per call |
 | M0.6 | done (PR #6) | Alembic `0001_initial` = 04 §6 SQL verbatim; `make migrate` idempotent; upgrade/downgrade/re-upgrade tested |
+| M1.6 | in-progress (PR pending; 10 known-item queries await owner confirmation) | `index` stage: 313 docs in `legal_units_v1` behind `legal_units`; protected terms; one model per index; bge-m3 multi-vectors cached (ADR-020); smoke ranks recorded |
+| M1.5 follow-up | done (PR #26) | real-graph tests in CI on the text-free structure artifact; `neo4j-test` instance; `context_of` relations |
 | M1.5 | done (PR #25) | `load_graph` (`pdp_ingest/graph_load.py`) + `pdp_core/graph` (constraints, canonical queries); 568 nodes, 1661 edges for UU 27/2022; counts equal artifacts |
 | M1.4 link flags | done (PR #24) | `nested_in_informal` / `ambiguous_case` on defined links; term sample rebuilt with those quotas (unlabeled); DataCategory modeling + UNKNOWN rule documented |
 | M1.4 | done (PR #23) | `defs` stage: 11 definitions (1 alias), 400 USES_TERM links, 15 informal, 15 DataCategory candidates (proposed); review list + 40-item link sample built, labels pending |
@@ -70,8 +72,17 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 | 2026-11-06 | Term-link label set (M1.4, 06 §2.10, rebuilt in PR #24), seed 20261105 | 40 items: 30 of 400 defined links (11 terms; 1 of 1 nested, 12 of 69 ambiguous_case), 10 of 15 informal (7 terms). Link precision: not yet measured (labels pending) | `python -m pdp_eval terms-sample` |
 | 2026-11-06 | UU 27/2022 graph (M1.5) | 568 nodes (Source 1, Structure 22: BAB 16 + Bagian 6, LegalUnit 519, Definition 11, DataCategory 15) and 1661 edges (PART_OF 361, IN_SOURCE 567, EXPLAINED_BY 163, REFERENCES 146, DEFINES 11, USES_TERM 400, SUBCATEGORY_OF 13); graph counts equal artifact counts | `make load-graph SOURCE=uu27-2022` |
 | 2026-11-06 | load_graph time (M1.5), Neo4j 5.26 community in compose, laptop Ryzen 7 PRO 4750U (16 threads), batch 500 | fresh load (source subgraph removed first, constraints existing): 0.58 s, 0.37 s, 0.80 s over 3 runs; first-ever load incl. constraint creation: 2.07 s; re-run on a loaded graph: 0.27 to 0.51 s | `python -m pdp_ingest.graph_load` |
+| 2026-11-06 | index stage (M1.6), UU 27/2022, laptop Ryzen 7 PRO 4750U (16 threads), models-aux as a host process (fp32, `torch_threads` 8), batch 16, OpenSearch 2.19.7 in compose | 313 documents (PASAL 34, AYAT 122, HURUF 144, ANGKA 13); embedding dense + multi-vector in one pass: 92.4 s and 88.8 s over 2 runs; OpenSearch write + alias swap: 2.2 s and 1.5 s; index store 8,173,903 bytes after the first run, 11,890,719 bytes after re-indexing the same 313 documents (overwritten documents not merged yet) | `make index SOURCE=uu27-2022` |
+| 2026-11-06 | bge-m3 multi-vector cache (M1.6) | 313 rows, 10,463 token vectors (max 153 per document), 1024-d float16: 28,625,709 bytes | `data/processed/uu27-2022/multivectors/` |
+| 2026-11-06 | known-item smoke (M1.6), 10 proposed queries, NOT owner-confirmed, no tuning, top 10, as_of today | expected unit found: bm25_plain 5/10, bm25_stem 5/10, multi_field 6/10, dense 8/10, hybrid RRF 8/10. Both exact-reference queries (ki01 "Pasal 46 ayat (1)", ki02 "Pasal 4 ayat (2)") miss in every mode, although `context_text` alone ranks ki01's unit first: in `most_fields` the text fields of units that mention "ayat (1)" outscore it. Per-query ranks in the PR | `make known-items SOURCE=uu27-2022` |
 
 ## Follow-ups discovered
+
+- **M1.6 exact references in retrieval:** BM25 multi-field misses "Pasal 46 ayat (1)"-style queries (smoke: ki01, ki02). 03 §5.2 already plans to force-include explicit reference hints; M1.10 must implement that path (parse the query with the `refs` grammar, fetch the unit by id), not tune BM25 on these queries.
+- **M1.6 enclitic forms vs protected terms:** `keyword_marker` matches whole tokens, so "pribadinya" is not protected and the stemmer turns it into "pribad"-like forms, while "pribadi" stays whole. Decide in M1.10 whether to add "-nya" variants or a `stemmer_override`, with an eval delta.
+- **M1.6 document count:** the owner's brief says "embedding 519 units". 04 §4 indexes 313: Penjelasan (164) go into `penjelasan_text`, and the 42 Pasal with ayat have empty text. Multi-vectors exist for the 313 documents only. Owner to confirm, or extend to Penjelasan.
+- **M1.6 models-aux image:** the compose image must be rebuilt (`docker compose build models-aux`), and `make models-download` re-run for `colbert_linear.pt`, before `make up-llm` serves multi-vectors. The measurements above used a host process.
+- **M1.6 OpenSearch test isolation:** integration tests use per-session `itest-<hex>-` index and alias names on the dev OpenSearch and delete them afterwards (same pattern as the per-test Postgres databases). No second OpenSearch instance, to keep its 1 GB heap out of the budget; say if a separate instance is wanted, as for Neo4j.
 
 - ruff 0.17 formats code blocks inside Markdown by default; ruff config and pre-commit hooks are limited to `.py`/`.pyi` so tooling never rewrites `.context/`.
 - Global `core.hooksPath` on the dev machine points elsewhere, so `pre-commit install` refuses; it stays untouched. Run `make check` before every commit; CI runs the same hooks plus a full-history gitleaks scan.
@@ -176,6 +187,7 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 | 2026-11-05 | M1.3 (owner): one mention per reference chain with char span, raw text, resolution and explicit range expansion; delegation phrases are mention kind DELEGATION with no graph edge yet; "Undang-Undang ini" is SELF; external instruments EXTERNAL_UNRESOLVED with the instrument kept; Penjelasan refs resolve relative to the explained unit (04 §3.7). Resolver evaluated on an owner-labeled 50+20 sample at target level, recall ≥ 95% / precision ≥ 98% [TARGET] (06 §2.9) | M1.3, FR-PDP-03 |
 | 2026-11-06 | M1.5 (owner): load from stage artifacts only, idempotent MERGE in batched transactions; version-1 validity from `effective_from`; edges per 04 §3.2 with REFERENCES span and USES_TERM flags; Source provenance; consistency test; canonical queries on fixture and real graph. DataCategory nodes keyed by `source_id` + `code` so sources and test fixtures never share a category node | M1.5, FR-PDP-06 |
 | 2026-11-06 | M1.5 follow-up (owner): CI runs real-graph ID/structure tests on a committed text-free structure artifact, text tests local-only (`needs_corpus`), drift checked by a snapshot test; integration tests use a separate wiped Neo4j test instance, never the dev graph (DataCategory key unchanged, not an isolation mechanism); `context_of` labels Penjelasan relations | M1.5, FR-PDP-06 |
+| 2026-11-06 | M1.6 (owner): `legal_units_v1` behind alias `legal_units` with atomic swap; per-document embedding model + revision, no mixed models; `text` / `.stem` / `.shingle`, context, Penjelasan, terms, concepts, validity, dense embedding; `keyword_marker` protected terms; bge-m3 multi-vectors cached for M1.10, not indexed; 10 known-item queries need owner confirmation; smoke per mode, no tuning. ColBERT head read without unpickling (ADR-020) | M1.6, FR-PDP-07 |
 | 2026-11-06 | M1.4 interpretation (owner):
 - definition units link other terms (no self-link);
 - a defined match inside an informal one is kept and flagged `nested_in_informal`;
@@ -189,6 +201,12 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 | 2026-11-05 | ADR-019: amendments are separate sources linked by `AMENDS`; consolidated text is `derived: true`, for retrieval only, never cited alone; KUHP 613(3) left as an open question. Implementation M4.4 | ADR-019 |
 
 ## Session log
+
+### 2026-11-06 — M1.6 index
+- models-aux: `/embed` returns `revision`, plus `multi_vectors` on request (bge-m3 ColBERT head, read without unpickling, ADR-020; `colbert_linear.pt` pinned by SHA-256 and checked bit-identical to a reference load).
+- `pdp_core/search`: index body (analyzers, protected terms, `_meta`), query bodies (BM25 field sets, k-NN, RRF), OpenSearch REST calls (`ensure_index` / `bulk` model guard, atomic `swap_alias`, `_analyze`), models-aux client, `SearchSettings`.
+- `pdp_ingest/index.py`: documents (04 §4), embeddings, multi-vector cache, `make index`. `pdp_eval/known_items.py` + `data/review/uu27-2022/known_items.md` (10 proposed queries), `make known-items`.
+- Tests: colbert reader (4), multi-vector API (2), settings pins (2), search bodies (11), index documents/cache/guard (6), OpenSearch integration (6: stored mapping, protected terms via `_analyze`, alias swap, model guard on index and bulk, BM25/k-NN/validity), snapshot (3: committed body keywords and model, document counts), known-item parser (5), known-item test (skips until the owner confirms).
 
 ### 2026-11-06 — M1.5 follow-up: CI structure graph, test isolation, context_of relations
 - `pdp_ingest/graph_structure.py`: text-free export/import; `graph_load --export-structure` / `--from-structure`; `text_sha256` on LegalUnit and Definition.

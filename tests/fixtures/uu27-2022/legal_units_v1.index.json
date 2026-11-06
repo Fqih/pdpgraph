@@ -1,0 +1,159 @@
+{
+ "mappings": {
+  "_meta": {
+   "embedding_dim": 1024,
+   "embedding_model": "BAAI/bge-m3",
+   "embedding_revision": "7b44caba5c06fd6f1ef1d2786261e636c38e4295",
+   "index_version": 1
+  },
+  "dynamic": "strict",
+  "properties": {
+   "concepts": {
+    "type": "keyword"
+   },
+   "context_text": {
+    "analyzer": "legal_plain",
+    "fields": {
+     "stem": {
+      "analyzer": "legal_stem",
+      "type": "text"
+     }
+    },
+    "type": "text"
+   },
+   "embedding": {
+    "dimension": 1024,
+    "method": {
+     "engine": "lucene",
+     "name": "hnsw",
+     "space_type": "cosinesimil"
+    },
+    "type": "knn_vector"
+   },
+   "embedding_model": {
+    "type": "keyword"
+   },
+   "embedding_revision": {
+    "type": "keyword"
+   },
+   "kind": {
+    "type": "keyword"
+   },
+   "label": {
+    "type": "keyword"
+   },
+   "node_id": {
+    "type": "keyword"
+   },
+   "penjelasan_text": {
+    "analyzer": "legal_plain",
+    "fields": {
+     "stem": {
+      "analyzer": "legal_stem",
+      "type": "text"
+     }
+    },
+    "type": "text"
+   },
+   "source_id": {
+    "type": "keyword"
+   },
+   "terms": {
+    "type": "keyword"
+   },
+   "text": {
+    "analyzer": "legal_plain",
+    "fields": {
+     "shingle": {
+      "analyzer": "legal_shingle",
+      "type": "text"
+     },
+     "stem": {
+      "analyzer": "legal_stem",
+      "type": "text"
+     }
+    },
+    "type": "text"
+   },
+   "unit_id": {
+    "type": "keyword"
+   },
+   "valid_from": {
+    "type": "date"
+   },
+   "valid_to": {
+    "type": "date"
+   }
+  }
+ },
+ "settings": {
+  "analysis": {
+   "analyzer": {
+    "legal_plain": {
+     "filter": [
+      "lowercase"
+     ],
+     "tokenizer": "standard"
+    },
+    "legal_shingle": {
+     "filter": [
+      "lowercase",
+      "shingle_2_3"
+     ],
+     "tokenizer": "standard"
+    },
+    "legal_stem": {
+     "filter": [
+      "lowercase",
+      "protected_terms",
+      "indonesian_stemmer"
+     ],
+     "tokenizer": "standard"
+    }
+   },
+   "filter": {
+    "indonesian_stemmer": {
+     "language": "indonesian",
+     "type": "stemmer"
+    },
+    "protected_terms": {
+     "ignore_case": true,
+     "keywords": [
+      "badan",
+      "data",
+      "dpo",
+      "informasi",
+      "internasional",
+      "ketiga",
+      "korporasi",
+      "lembaga",
+      "orang",
+      "organisasi",
+      "pelindungan",
+      "pemerintah",
+      "pengendali",
+      "pihak",
+      "pribadi",
+      "prosesor",
+      "publik",
+      "pusat",
+      "setiap",
+      "subjek"
+     ],
+     "type": "keyword_marker"
+    },
+    "shingle_2_3": {
+     "max_shingle_size": 3,
+     "min_shingle_size": 2,
+     "output_unigrams": false,
+     "type": "shingle"
+    }
+   }
+  },
+  "index": {
+   "knn": true,
+   "number_of_replicas": 0,
+   "number_of_shards": 1
+  }
+ }
+}

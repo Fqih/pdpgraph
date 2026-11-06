@@ -18,6 +18,11 @@ def _embed(texts: list[str]) -> list[list[float]]:
     return [[float(len(t)), 1.0] for t in texts]
 
 
+def _embed_multi(texts: list[str]) -> list[tuple[list[float], list[list[float]]]]:
+    CALLS.setdefault("embed_multi", []).append(len(texts))
+    return [([float(len(t)), 1.0], [[1.0, 0.0] for _ in t]) for t in texts]
+
+
 def _rerank(pairs: list[tuple[str, str]]) -> list[float]:
     CALLS.setdefault("rerank", []).append(len(pairs))
     return [1.0 if q.split()[0] in p else 0.0 for q, p in pairs]
@@ -37,10 +42,12 @@ def _nli(pairs: list[tuple[str, str]]) -> list[dict[str, float]]:
 
 FAKE = Models(
     embed=_embed,
+    embed_multi=_embed_multi,
     rerank=_rerank,
     nli=_nli,
     dim=2,
     names={"embed": "fake/embed", "rerank": "fake/rerank", "nli": "fake/nli"},
+    revisions={"embed": "f" * 40, "rerank": "e" * 40, "nli": "d" * 40},
 )
 
 

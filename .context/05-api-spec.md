@@ -203,7 +203,7 @@ Not exposed publicly; no routing.
 
 | Endpoint | Body | Returns |
 |---|---|---|
-| `POST /embed` | `{inputs: [str], kind: "query"|"passage"}` | `{model, dim, vectors}` |
+| `POST /embed` | `{inputs: [str], kind: "query"|"passage", multi_vector?: bool}` | `{model, revision, dim, vectors, multi_vectors?}`; `multi_vectors` (one L2-normalized vector per token after CLS, padding dropped; bge-m3 ColBERT head, ADR-020) only when `multi_vector: true` |
 | `POST /rerank` | `{query, passages: [str]}` | `{model, scores}` |
 | `POST /nli` | `{pairs: [{premise, hypothesis}]}` | `{model, results: [{entailment, neutral, contradiction}]}` |
 

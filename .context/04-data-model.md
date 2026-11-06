@@ -261,7 +261,7 @@ Nothing is re-parsed.
 
 ## 4. Search index (OpenSearch)
 
-Index `legal_units_v{n}` (aliased as `legal_units`), one document per citable `LegalUnit` of kind `PASAL` (only when it has no ayat), `AYAT`, `HURUF`, `ANGKA`.
+Index `legal_units_v{n}` (`n` = `pdp_core.search.INDEX_VERSION`, now 1), aliased as `legal_units`. It holds one document per citable `LegalUnit` of kind `AYAT`, `HURUF`, `ANGKA`, or `PASAL` when it has no ayat. Penjelasan are not documents. The `_id` is `node_id`. For UU 27/2022 this gives 313 documents: PASAL 34, AYAT 122, HURUF 144, ANGKA 13.
 
 | Field | Type | Notes |
 |---|---|---|
@@ -269,17 +269,44 @@ Index `legal_units_v{n}` (aliased as `legal_units`), one document per citable `L
 | `unit_id` | keyword | |
 | `source_id` | keyword | |
 | `kind` | keyword | |
-| `label` | keyword | |
-| `text` | text, analyzer `indonesian` (+ `standard` subfield) | BM25 |
-| `context_text` | text | parent Pasal heading + Bab heading for BM25 boost |
-| `penjelasan_text` | text | lower boost |
-| `terms` | keyword[] | defined terms used |
-| `concepts` | keyword[] | |
-| `valid_from` / `valid_to` | date | range filter |
-| `embedding` | knn_vector (dim per model, HNSW, cosine) | dense |
-| `embedding_model` | keyword | guard against mixing models |
+| `label` | keyword | e.g. "Pasal 46 ayat (1)" |
+| `text` | text, `legal_plain` (standard + lowercase, no stemming); subfields `text.stem` (`legal_stem`), `text.shingle` (`legal_shingle`) | BM25 |
+| `context_text` | text, `legal_plain` + `.stem` | structure headings (BAB, Bagian, Paragraf), then ancestor unit texts (lead-ins such as "… meliputi:"), then the unit label, joined by " / " |
+| `penjelasan_text` | text, `legal_plain` + `.stem` | Penjelasan of the unit and its ancestors, without "Cukup jelas."; lower boost |
+| `terms` | keyword[] | `term_norm` of the defined terms used (`USES_TERM`) |
+| `concepts` | keyword[] | empty until concept tagging |
+| `valid_from` / `valid_to` | date | range filter; no `valid_to` = open |
+| `embedding` | knn_vector (dim from the model, HNSW, Lucene, cosine) | bge-m3 dense vector of the ancestor lead-ins + unit text |
+| `embedding_model`, `embedding_revision` | keyword | per document |
 
-Reindexing creates a new versioned index and swaps the alias atomically.
+**Analyzers (no stop words)**
+- `legal_plain`: standard tokenizer, lowercase.
+- `legal_stem`: lowercase, then `keyword_marker` `protected_terms` (ignore case), then the Indonesian stemmer.
+- `legal_shingle`: lowercase 2- and 3-word shingles, no unigrams.
+
+**Protected terms**
+- The marker's keywords are the lowercase words of the source's defined terms and aliases (`terms.json`), plus the Actor vocabulary words (§3.1).
+- So "pengendali", "pribadi" and "prosesor" stay whole in `text.stem` while other words stem ("kewajiban" becomes "wajib"). Without the marker the stemmer turns "pengendali" into "endali" and "pribadi" into "pribad".
+- The body is committed at `tests/fixtures/uu27-2022/legal_units_v1.index.json`. A unit test pins the code to it; a snapshot test pins its keywords to a fresh ingest and its model to `configs/models_aux.yaml`.
+
+**One model per index**
+- The mapping `_meta` holds `embedding_model`, `embedding_revision`, `embedding_dim` and `index_version`.
+- `ensure_index` refuses an existing index whose `_meta` differs. `bulk` refuses documents of another model, revision or dim. The stage refuses a model change mid-run.
+
+**Reindexing**
+- A new mapping bumps `INDEX_VERSION`.
+- After indexing, one `_aliases` call removes `legal_units` from every other index and adds it to the new one (atomic).
+- Re-running the same version upserts by `_id`.
+
+**Multi-vector cache**
+- During embedding, the bge-m3 ColBERT outputs (one 1024-d vector per token, ADR-020) are written per document to `data/processed/<id>/multivectors/<model>@<revision[:12]>.jsonl`, as base64 float16, keyed by `node_id` + revision.
+- They are not indexed and not used; they exist for the M1.10 rerank experiment.
+
+**Query bodies (`pdp_core.search.queries`; untuned defaults)**
+- Every query is filtered by `valid_from ≤ as_of < valid_to`.
+- BM25 field sets: `bm25_plain` (`text`), `bm25_stem` (`text.stem`), `multi_field` (`text`, `text.stem`, `text.shingle`, `context_text(.stem)`, `penjelasan_text(.stem)` ^0.5), all `most_fields`.
+- Dense: k-NN on `embedding`.
+- Hybrid: RRF (k = 60) of `multi_field` and dense.
 
 ## 5. Application schemas (Pydantic)
 

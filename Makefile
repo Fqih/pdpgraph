@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help sync lint fmt check test cov migrate test-int up-test eval-smoke eval-record up down up-llm up-mock up-obs ingest models-download test-models test-snapshot load-graph
+.PHONY: help sync lint fmt check test cov migrate test-int up-test eval-smoke eval-record up down up-llm up-mock up-obs ingest models-download test-models test-snapshot load-graph index known-items
 
 UV := uv run --frozen
 COMPOSE := docker compose --project-directory . -f deploy/compose/compose.yaml
@@ -67,6 +67,14 @@ ingest: .env ## Ingest a source, e.g. make ingest SOURCE=uu27-2022 (stages so fa
 load-graph: .env ## Load a source's stage artifacts into Neo4j, e.g. make load-graph SOURCE=uu27-2022 (needs make ingest, make up)
 	@test -n "$(SOURCE)" || { echo "usage: make load-graph SOURCE=<source_id>" >&2; exit 1; }
 	$(UV) python -m pdp_ingest.graph_load --source $(SOURCE)
+
+index: .env ## Embed and index a source into OpenSearch legal_units, e.g. make index SOURCE=uu27-2022 (needs make ingest, make up, models-aux)
+	@test -n "$(SOURCE)" || { echo "usage: make index SOURCE=<source_id>" >&2; exit 1; }
+	$(UV) python -m pdp_ingest.index --source $(SOURCE)
+
+known-items: ## Known-item smoke ranks per retrieval mode, e.g. make known-items SOURCE=uu27-2022 (needs make index)
+	@test -n "$(SOURCE)" || { echo "usage: make known-items SOURCE=<source_id>" >&2; exit 1; }
+	$(UV) python -m pdp_eval.known_items --source $(SOURCE)
 
 # Targets below land in later roadmap tasks; they fail loudly until then.
 

@@ -135,3 +135,14 @@ Format: Context → Decision → Consequences → Alternatives rejected. Status:
 **Open modeling question:** KUHP Pasal 613 ayat (3), added by UU 1/2026, requires administrative sanctions to be applied before criminal sanctions in "administrative laws with criminal sanctions". Its Penjelasan names UU 27/2022. This is neither a text change nor a reading change. No relation is added yet, and questions on the Pasal 57 / Pasal 67–70 interplay are deferred from the golden set.
 **Consequences:** Answers on amended provisions cite two official texts, and derived text helps retrieval without ever becoming evidence. Ingesting UU 1/2026 and KUHP (at least Pasal 79) is M4.4 work, with an extension of the §2 grammar for their unit ids. `pending_changes.yaml` entries are removed once the change is modeled.
 **Rejected:** A `SUPERSEDES` version holding our own consolidated text (not official; it would be cited as if it were law). Editing the 2022 text in place (destroys `as_of` history).
+
+## ADR-020 — bge-m3 ColBERT head read from its pickle file without unpickling
+**Status:** Accepted · 2026-11-06 (M1.6)
+**Context:** The owner asked for bge-m3 multi-vector (ColBERT) outputs per unit, cached for the M1.10 rerank experiment. The pinned revision ships the ColBERT head only as `colbert_linear.pt`, a `torch.save` pickle (one fp16 `Linear(1024, 1024)` state dict, 2,100,674 bytes). SEC-13 prefers safetensors, and the service never unpickles weights.
+**Decision:**
+- `colbert_linear.pt` is fetched with the other pinned files, and its SHA-256 is pinned in `configs/models_aux.yaml` (`pinned_sha256`). The hash is checked before the file is opened.
+- `models_aux.colbert.read_linear` never unpickles. It disassembles `data.pkl` with `pickletools.genops`, which executes nothing, and refuses any global outside `OrderedDict`, `torch._utils._rebuild_tensor_v2`, `HalfStorage` and `FloatStorage`. It then reads the two raw little-endian storages from the zip, identified by size (dim² and dim elements).
+- One-time check (2026-11-06): the tensors read this way are bit-identical to `torch.load(weights_only=True)` of the same file.
+- `/embed` returns multi-vectors only on request (`multi_vector: true`). They are computed as in bge-m3: head over the token states after CLS, L2-normalized, padding dropped. They are cached; they are neither indexed nor used for answers.
+**Consequences:** One extra 2 MB pinned file in the model cache (`make models-download`). A changed file fails the hash check, and a changed pickle shape fails the globals or size checks; the service then refuses to start. The dense path is unchanged.
+**Rejected:** `torch.load(weights_only=True)` at runtime (a restricted unpickler, but still unpickling, against SEC-13). A third-party safetensors conversion of the head (unpinned provenance). Skipping multi-vectors (requested for M1.10).
