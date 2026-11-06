@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass
 from datetime import date
-from typing import Any
+from typing import Any, Literal
 
 from neo4j import Driver, RoutingControl
 
@@ -18,7 +18,7 @@ class VersionError(Exception):
 class DefinitionUse:
     unit: str
     definition: str
-    term: str
+    term: str | None  # None in a text-less graph (structure artifact)
     defined_by: str
     count: int
     nested_in_informal: bool
@@ -26,10 +26,16 @@ class DefinitionUse:
 
 
 @dataclass(frozen=True)
+class Explanation:
+    node_id: str
+    relation: Literal["own_explanation", "ancestor_explanation", "descendant_explanation"]
+
+
+@dataclass(frozen=True)
 class Context:
     pasal: str | None
     siblings: tuple[str, ...]  # same kind, same parent, document order
-    penjelasan: tuple[str, ...]  # of the unit, its ancestors up to the Pasal, its descendants
+    penjelasan: tuple[Explanation, ...]  # the unit, its ancestors up to the Pasal, descendants
 
 
 @dataclass(frozen=True)
@@ -69,7 +75,9 @@ def context_of(driver: Driver, node_id: str) -> Context:
     r = rows[0]
     pj = sorted(r["penjelasan"], key=lambda p: p["order"])
     return Context(
-        next(iter(r["pasal"]), None), tuple(r["siblings"]), tuple(p["node_id"] for p in pj)
+        next(iter(r["pasal"]), None),
+        tuple(r["siblings"]),
+        tuple(Explanation(p["node_id"], p["relation"]) for p in pj),
     )
 
 

@@ -90,8 +90,8 @@ Rules:
 |---|---|---|
 | `:Source` | `source_id`, `title`, `instrument_type`, `number`, `year`, `enacted_on`, `promulgated_on`, `effective_from`, `url`, `body_sha256`, `canonicalization_version`, `parser_version`, `segment_version`, `refs_version`, `defs_version`, `overrides_total`, `overrides_unconfirmed` | Provenance of the loaded artifacts (`source.json`, §3.9) |
 | `:Structure` | `node_id`, `unit_id`, `kind ∈ {BAB, BAGIAN, PARAGRAF}`, `number`, `heading` | Grouping only, not citable |
-| `:LegalUnit` | `node_id`, `unit_id`, `kind ∈ {PASAL, AYAT, HURUF, ANGKA, PENJELASAN}`, `text`, `text_norm`, `label`, `valid_from`, `valid_to` (null = open), `version`, `order` | **Citable** units |
-| `:Definition` | `node_id` (`<source>/def/<slug>@1`), `term`, `term_norm`, `aliases[]`, `text` | From definitional articles. The artifacts' `node_id` is the versionless id; the graph appends `@<version>` (§2) |
+| `:LegalUnit` | `node_id`, `unit_id`, `kind ∈ {PASAL, AYAT, HURUF, ANGKA, PENJELASAN}`, `text`, `text_norm`, `text_sha256`, `label`, `valid_from`, `valid_to` (null = open), `version`, `order` | **Citable** units. `text`/`text_norm` are absent in a text-less graph (§3.9) |
+| `:Definition` | `node_id` (`<source>/def/<slug>@1`), `term`, `term_norm`, `aliases[]`, `text`, `text_sha256` | From definitional articles. The artifacts' `node_id` is the versionless id; the graph appends `@<version>` (§2) |
 | `:Obligation` | `node_id`, `actor_role`, `action`, `object`, `condition`, `deadline`, `modality ∈ {WAJIB, DILARANG, DAPAT}`, `review_status ∈ {PENDING, APPROVED, REJECTED}` | Extracted; only `APPROVED` used online |
 | `:Actor` | `name ∈ {PENGENDALI, PROSESOR, SUBJEK_DATA, LEMBAGA, DPO, PIHAK_KETIGA, ...}` | Controlled vocabulary |
 | `:DataCategory` | `source_id` + `code` (key), `label`, `unit_id`, `open`, `explanation`, `status ∈ {proposed, confirmed}` | Derived from Pasal 4 (§3.8): classes `SPESIFIK`, `UMUM`; members `KESEHATAN`, `BIOMETRIK`, `GENETIKA`, `CATATAN_KEJAHATAN`, `ANAK`, `KEUANGAN_PRIBADI`, `LAINNYA` (open) under `SPESIFIK`; `NAMA_LENGKAP`, `JENIS_KELAMIN`, `KEWARGANEGARAAN`, `AGAMA`, `STATUS_PERKAWINAN`, `DIKOMBINASIKAN_UNTUK_MENGIDENTIFIKASI_SESEORANG` under `UMUM`. All `proposed` until the owner confirms them. `SPESIFIK` and `UMUM` are parent nodes; members link to them with `SUBCATEGORY_OF`. `LAINNYA` is open-ended (03 §5.3: unmappable categories give `UNKNOWN`) |
@@ -134,7 +134,7 @@ CREATE INDEX legal_unit_validity IF NOT EXISTS FOR (n:LegalUnit) ON (n.valid_fro
 
 - `expand_references(node_ids, as_of, max_hops)` — variable-length `REFERENCES` traversal, filtered by validity at `as_of`, returning paths.
 - `definitions_for(node_ids, as_of)` — `USES_TERM` targets with defining unit.
-- `context_of(node_id)` — parent Pasal + sibling ayat + Penjelasan.
+- `context_of(node_id)` — parent Pasal + sibling ayat + Penjelasan, each Penjelasan labeled `own_explanation`, `ancestor_explanation` or `descendant_explanation`.
 - `version_at(unit_id, as_of)` — the single valid version (assert exactly one).
 - `candidate_obligations(actor_role, data_categories[], concepts[], as_of)` — gap-analysis seed.
 
@@ -221,6 +221,7 @@ Nothing is re-parsed.
 **Node rules**
 - Every unit is version 1: `node_id = unit_id@1`, `valid_from = Source.effective_from`, no `valid_to` (open; Neo4j stores no nulls).
 - `text_norm` is the text NFC-normalized, lowercased, with whitespace collapsed.
+- `text_sha256` is the SHA-256 of the UTF-8 text (units and definitions).
 
 **Edge rules**
 - `PART_OF {order}`: body units point to their parent unit or structure; Bagian/Paragraf point to their parent structure. Penjelasan units have no `PART_OF`.
@@ -234,6 +235,14 @@ Nothing is re-parsed.
 **Category status**
 - `confirmed` when the owner's verdict is `confirmed`, else `proposed`.
 
+**Text-free structure (CI)**
+- The law text is not committed ([VERIFY], redistribution undecided). `--export-structure PATH` writes every row without its text fields (`heading`; `text`, `text_norm`; `term`, `term_norm`, `aliases`; category `label`, `explanation`; `mention_text`), keeping ids, kinds, order, edges, edge properties, `text_sha256` and Source provenance (`pdp_ingest.graph_structure`, sorted-key JSON).
+- `tests/fixtures/<id>/structure.json` is committed. `--from-structure PATH` loads it as a text-less graph: same nodes, edges and counts. CI runs the real-graph ID/structure tests on it; exact-text tests are `needs_corpus` (local only).
+- A `snapshot` test re-runs the text stages and fails if the committed structure differs.
+
+**Test isolation**
+- Integration tests use the separate `neo4j-test` instance (compose profile `test`, `make up-test`, `127.0.0.1:7688`, tmpfs data), wiped at the start and end of each test session. They refuse the dev port 7687.
+
 **Consistency check**
 - The CLI and the integration test compare graph counts with the artifact counts per label and edge type, and fail naming every mismatch.
 
@@ -242,7 +251,8 @@ Nothing is re-parsed.
 - `context_of`: returns
   - the unit's Pasal;
   - its siblings (same kind, same parent);
-  - the Penjelasan units of the unit, its ancestors up to the Pasal, and its descendants.
+  - the Penjelasan units of the unit, its ancestors up to the Pasal, and its descendants (up to 3 levels), in document order, each with a `relation`: `own_explanation` (of the unit itself), `ancestor_explanation` (of a unit it is part of) or `descendant_explanation` (of a unit part of it; e.g. Pasal 20 ayat (2) has none of its own, its huruf do).
+- `definitions_for`: ordered by unit, then definition id; `term` is null in a text-less graph.
 - `version_at`: raises unless exactly one version is valid.
 - `candidate_obligations`:
   - takes approved obligations of the actor whose units are valid at `as_of`;

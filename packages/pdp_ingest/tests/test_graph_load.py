@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Graph rows from the stage artifacts (M1.5, FR-PDP-06); loading itself is an integration test."""
 
+import hashlib
 import json
 from datetime import date
 from pathlib import Path
@@ -11,6 +12,7 @@ from pdp_ingest.canonical import blocks
 from pdp_ingest.defs import data_categories, extract_definitions, link_terms
 from pdp_ingest.defs_review import CATEGORY_SECTION, defs_markdown
 from pdp_ingest.graph_load import ArtifactError, GraphData, read_graph
+from pdp_ingest.graph_structure import export_structure, read_structure, write_structure
 from pdp_ingest.pipeline import write_graph_artifacts
 from pdp_ingest.refs import extract_refs
 from pdp_ingest.review import Review
@@ -162,3 +164,34 @@ def test_missing_artifact_is_an_error(tmp_path: Path) -> None:
 def test_source_manifest_is_json(tmp_path: Path) -> None:
     root = _artifacts(tmp_path)
     assert json.loads((root / "processed" / S / "source.json").read_text())["source_id"] == S
+
+
+def test_text_hashes_on_units_and_definitions(graph: GraphData) -> None:
+    for row in graph.units + graph.definitions:
+        assert row["text_sha256"] == hashlib.sha256(row["text"].encode("utf-8")).hexdigest()
+
+
+def test_structure_export_has_no_text(graph: GraphData) -> None:
+    exported = export_structure(graph)
+    dumped = json.dumps(exported, ensure_ascii=False, default=str)
+    for key in ('"text"', '"text_norm"', '"heading"', '"term"', '"aliases"', '"mention_text"'):
+        assert key not in dumped
+    assert "data tentang orang" not in dumped
+    assert "Definisi" not in dumped  # a heading
+    assert all("label" not in c and "explanation" not in c for c in exported["categories"])
+    assert {u["node_id"]: u["text_sha256"] for u in exported["units"]}["s/p1/n1@1"] == (
+        hashlib.sha256(b"Data Pribadi adalah data tentang orang.").hexdigest()
+    )
+
+
+def test_structure_round_trip(graph: GraphData, tmp_path: Path) -> None:
+    path = tmp_path / "structure.json"
+    write_structure(graph, path)
+    first = path.read_bytes()
+    back = read_structure(path)
+    assert back.counts() == graph.counts()
+    assert back.sources[0]["effective_from"] == date(2000, 1, 3)
+    assert back.units[0]["valid_from"] == date(2000, 1, 3)
+    assert export_structure(back) == export_structure(graph)
+    write_structure(back, path)
+    assert path.read_bytes() == first  # deterministic

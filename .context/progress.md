@@ -7,8 +7,8 @@ Claude Code updates this file at the end of every session. Newest entry on top o
 | Field | Value |
 |---|---|
 | Phase | 1 — PDPGraph MVP (week 1) |
-| Current task | M1.5 done (PR #25); next per 08: M1.6 |
-| Last updated | 2026-11-05 |
+| Current task | M1.5 follow-up (CI structure graph, test isolation, context_of relations); next: M1.6 |
+| Last updated | 2026-11-06 |
 | Release | none |
 
 ## Task board
@@ -108,7 +108,7 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 - **M1.4 → owner:**
   - Review `data/review/uu27-2022/definitions.md`: 11 definitions (term and text against the PDF; the page is shown) and 15 DataCategory codes (`confirmed` / `code_change` / `not_a_category`).
   - Label `evals/datasets/pdp-terms/v0/sample.jsonl` with `uv run python -m pdp_eval terms-label`, then run `terms-report --out evals/reports/<date>-pdp-terms-<sha>/report.md`.
-- **M1.5 real-graph tests in CI:** `tests/integration/test_graph_uu27.py` skips without the git-ignored stage artifacts, so CI runs only the synthetic fixture graph. Committing `data/processed/uu27-2022/` would let CI run it, but that redistributes the law text, which depends on the open [VERIFY] question on redistribution terms. Owner decides.
+- **M1.5 real-graph tests in CI:** resolved without committing text: CI loads the committed text-free `tests/fixtures/uu27-2022/structure.json` (04 §3.9). Exact-text tests stay `needs_corpus`. Committing the text itself still waits on the [VERIFY] redistribution question.
 - **M1.5 `candidate_obligations`:** implemented and tested on hand-made Obligation nodes in the fixture. No Obligation nodes are loaded until the obligation-extraction task.
 - **M1.4 nested quota:** the owner asked for at least 3 nested links in the sample; UU 27/2022 has only 1, which is included. More come with later sources.
 - **M1.10/M1.11 Penjelasan glosses:** "Yang dimaksud dengan "x" adalah ..." glosses (37 occurrences in UU 27/2022) may serve as retrieval hints only (query expansion, reranker features). They are never cited as the law's definitions and never become `Definition` nodes.
@@ -175,6 +175,7 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 | 2026-11-05 | M1.2 safeguards (owner): unconfirmed overrides stay applied, but the `sources` row (new columns, migration 0002, 04 §6) and every eval report record `overrides_total`/`overrides_unconfirmed`; 08 v0.1 exit gate requires `overrides_unconfirmed = 0`. Overrides gain `changes_meaning` (4 set). `crosscheck.md` follows the owner's review order (meaning-changing overrides + Pasal 26(2), other 27 overrides, 10 snapshot units, 83 flagged units worst-first); each snapshot/flagged unit has a `Review: reviewed_by: <name> \| verdict: komdigi_ok\|override_needed\|ocr_noise` line that regeneration keeps | M1.2 |
 | 2026-11-05 | M1.3 (owner): one mention per reference chain with char span, raw text, resolution and explicit range expansion; delegation phrases are mention kind DELEGATION with no graph edge yet; "Undang-Undang ini" is SELF; external instruments EXTERNAL_UNRESOLVED with the instrument kept; Penjelasan refs resolve relative to the explained unit (04 §3.7). Resolver evaluated on an owner-labeled 50+20 sample at target level, recall ≥ 95% / precision ≥ 98% [TARGET] (06 §2.9) | M1.3, FR-PDP-03 |
 | 2026-11-06 | M1.5 (owner): load from stage artifacts only, idempotent MERGE in batched transactions; version-1 validity from `effective_from`; edges per 04 §3.2 with REFERENCES span and USES_TERM flags; Source provenance; consistency test; canonical queries on fixture and real graph. DataCategory nodes keyed by `source_id` + `code` so sources and test fixtures never share a category node | M1.5, FR-PDP-06 |
+| 2026-11-06 | M1.5 follow-up (owner): CI runs real-graph ID/structure tests on a committed text-free structure artifact, text tests local-only (`needs_corpus`), drift checked by a snapshot test; integration tests use a separate wiped Neo4j test instance, never the dev graph (DataCategory key unchanged, not an isolation mechanism); `context_of` labels Penjelasan relations | M1.5, FR-PDP-06 |
 | 2026-11-06 | M1.4 interpretation (owner):
 - definition units link other terms (no self-link);
 - a defined match inside an informal one is kept and flagged `nested_in_informal`;
@@ -188,6 +189,13 @@ Statuses: `todo`, `in-progress`, `blocked (<reason>)`, `done (<PR/commit>)`.
 | 2026-11-05 | ADR-019: amendments are separate sources linked by `AMENDS`; consolidated text is `derived: true`, for retrieval only, never cited alone; KUHP 613(3) left as an open question. Implementation M4.4 | ADR-019 |
 
 ## Session log
+
+### 2026-11-06 — M1.5 follow-up: CI structure graph, test isolation, context_of relations
+- `pdp_ingest/graph_structure.py`: text-free export/import; `graph_load --export-structure` / `--from-structure`; `text_sha256` on LegalUnit and Definition.
+- `tests/fixtures/uu27-2022/structure.json` (519 units, 1661 edges, no text) committed; snapshot test re-ingests and fails on drift (checked by mutating one count).
+- `tests/integration/test_graph_uu27.py` runs in CI on the text-less graph (ids, counts, queries); `test_graph_uu27_corpus.py` holds the text checks (`needs_corpus`).
+- `neo4j-test` compose service (profile `test`, `127.0.0.1:7688`, tmpfs), `make up-test`, CI step; `graph_driver` session fixture refuses port 7687 and wipes the test instance per session.
+- `context_of` labels Penjelasan `own_explanation` / `ancestor_explanation` / `descendant_explanation`; `definitions_for` orders by definition id and `term` may be null.
 
 ### 2026-11-06 — M1.4 link flags (PR #24) + M1.5 load_graph
 - PR #24: `nested_in_informal` / `ambiguous_case` flags, term sample rebuilt with quotas, DataCategory modeling and the UNKNOWN rule documented.

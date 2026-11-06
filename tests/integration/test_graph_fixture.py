@@ -1,9 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """load_graph and the canonical queries on a synthetic fixture graph (M1.5, FR-PDP-06).
 
-Exact expected results. The fixture lives under its own source id and its own category codes and
-actor names, and is removed before and after, so a loaded real graph is left alone.
-Requires `make up`.
+Exact expected results, on the throwaway Neo4j test instance (`make up-test`, see conftest).
 """
 
 from collections.abc import Iterator
@@ -14,9 +12,9 @@ import pytest
 from neo4j import Driver
 
 from pdp_core.graph import (
+    Explanation,
     VersionError,
     candidate_obligations,
-    connect,
     context_of,
     definitions_for,
     expand_references,
@@ -112,12 +110,11 @@ def data(tmp_path_factory: pytest.TempPathFactory) -> GraphData:
 
 
 @pytest.fixture(scope="module")
-def driver(data: GraphData) -> Iterator[Driver]:
-    with connect() as d:
-        _wipe(d)
-        load(d, data, batch_size=3)  # small batches: several transactions per kind
-        yield d
-        _wipe(d)
+def driver(graph_driver: Driver, data: GraphData) -> Iterator[Driver]:
+    _wipe(graph_driver)
+    load(graph_driver, data, batch_size=3)  # small batches: several transactions per kind
+    yield graph_driver
+    _wipe(graph_driver)
 
 
 def _snapshot(driver: Driver) -> tuple[list[object], list[object]]:
@@ -197,9 +194,16 @@ def test_context_of(driver: Driver) -> None:
     ctx = context_of(driver, _n("p2/a2/ha"))
     assert ctx.pasal == _n("p2")
     assert ctx.siblings == (_n("p2/a2/hb"),)
-    assert ctx.penjelasan == (_n("p2/a2#pj"),)
+    assert ctx.penjelasan == (Explanation(_n("p2/a2#pj"), "ancestor_explanation"),)
     ayat = context_of(driver, _n("p2/a2"))
     assert ayat.siblings == (_n("p2/a1"), _n("p2/a3"))
+    assert ayat.penjelasan == (Explanation(_n("p2/a2#pj"), "own_explanation"),)
+    pasal = context_of(driver, _n("p2"))
+    assert [(e.node_id, e.relation) for e in pasal.penjelasan] == [
+        (_n("p2/a1#pj"), "descendant_explanation"),
+        (_n("p2/a2#pj"), "descendant_explanation"),
+        (_n("p2/a3#pj"), "descendant_explanation"),
+    ]
     with pytest.raises(KeyError):
         context_of(driver, _n("p99"))
 

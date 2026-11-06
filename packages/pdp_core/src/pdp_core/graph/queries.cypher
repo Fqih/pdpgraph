@@ -18,7 +18,7 @@ WHERE u.node_id IN $node_ids
 RETURN u.node_id AS unit, d.node_id AS definition, d.term AS term, du.node_id AS defined_by,
        r.count AS count, r.nested_in_informal AS nested_in_informal,
        r.ambiguous_case AS ambiguous_case
-ORDER BY unit, term
+ORDER BY unit, definition
 
 // name: context_of
 MATCH (u:LegalUnit {node_id: $node_id})
@@ -31,11 +31,14 @@ RETURN
   } AS siblings,
   COLLECT {
     MATCH (u)-[:PART_OF*0..3]->(x:LegalUnit)-[:EXPLAINED_BY]->(pj:LegalUnit)
-    RETURN pj {.node_id, .order}
+    RETURN pj {
+      .node_id, .order,
+      relation: CASE WHEN x = u THEN 'own_explanation' ELSE 'ancestor_explanation' END
+    } AS pj
     UNION
     MATCH (x:LegalUnit)-[:PART_OF*1..3]->(u)
     MATCH (x)-[:EXPLAINED_BY]->(pj:LegalUnit)
-    RETURN pj {.node_id, .order}
+    RETURN pj {.node_id, .order, relation: 'descendant_explanation'} AS pj
   } AS penjelasan
 
 // name: version_at

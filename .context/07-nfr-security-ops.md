@@ -137,6 +137,7 @@ JSON logs (structlog), fields: `ts`, `level`, `service`, `request_id`, `trace_id
 ## 7. Operations runbook (summary)
 
 - `make up` / `make up-llm` / `make up-obs` / `make up-mock` — compose profiles.
+- `make up-test` — throwaway Neo4j for integration tests (`127.0.0.1:7688`, tmpfs); `make test-int` needs `make up` + `make up-test`.
 - `make ingest SOURCE=uu27-2022` — full ingestion with snapshot checks.
 - `make eval-smoke` (replay), `make eval-full PROFILE=cpu-local BUDGET_USD=<cap>`, `make eval-record`.
 - `make loadtest PROFILE=mock SCENARIO=sweep`; `make chaos`.
