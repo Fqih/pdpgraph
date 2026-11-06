@@ -13,7 +13,11 @@ Usage linking, per unit (Penjelasan included):
 2. informal usage: case-insensitive occurrences that differ in capitalization ("data pribadi",
    "subjek Data Pribadi"), longest first, not overlapping each other and not inside a defined
    occurrence. A defined occurrence may sit inside an informal one ("subjek Data Pribadi" keeps
-   its defined "Data Pribadi"). Recorded with low confidence; no edge.
+   its defined "Data Pribadi", flagged `nested_spans`). Recorded with low confidence; no edge.
+
+A defined occurrence opening a sentence (unit start, or after ".", ";", ":" or a line break) is
+flagged `ambiguous_spans`: its capital may be the sentence's. Flags never drop a link; the owner's
+labels decide (06 §2.10).
 
 Never linked: a defining unit's own term and aliases (no self-loop; other terms in a definition
 do link), and text inside reference mentions, so the "Pemerintah" of "Peraturan Pemerintah" is
@@ -44,6 +48,7 @@ _TRAILER = re.compile(r"[;.,]?\s*(?:dan/atau|dan|atau)?\s*$")
 _CODE_LEAD = {"data", "pribadi", "yang", "bersifat", "dan", "informasi"}
 _OPEN = " sesuai dengan "
 _ENCLITIC = "(?:nya)?"
+_SENTENCE_START = re.compile(r"(?:\A|[.;:]\s+|\n)\Z")
 # Classification Pasal per source, for data_categories().
 CLASSIFICATION_PASAL = {"uu27-2022": "p4"}
 _Match = tuple[int, int, str]  # start, end, definition node id
@@ -73,6 +78,17 @@ class TermUse:
     kind: Literal["defined", "informal"]  # defined -> USES_TERM edge; informal -> no edge
     count: int
     spans: tuple[tuple[int, int], ...]  # char spans in the unit text
+    nested_spans: tuple[int, ...] = ()  # indices of defined spans inside an informal match
+    ambiguous_spans: tuple[int, ...] = ()  # indices of defined spans opening a sentence
+
+    @property
+    def nested_in_informal(self) -> bool:
+        return bool(self.nested_spans)
+
+    @property
+    def ambiguous_case(self) -> bool:
+        """A sentence-initial capital may be the sentence's, not the term's."""
+        return bool(self.ambiguous_spans)
 
     @property
     def confidence(self) -> Literal["high", "low"]:
@@ -167,16 +183,28 @@ def _unit_uses(
         if (c[0], c[1]) not in exact_spans and not _inside(consumed, c[0], c[1])
     ]
     informal = _longest_first(loose, blocked)
+    loose_spans = [(a, b) for a, b, _ in informal]
     out = []
     for kind, matches in (("defined", found), ("informal", informal)):
         by_node: dict[str, list[tuple[int, int]]] = {}
         for a, b, node in sorted(matches):
             if node not in own:
                 by_node.setdefault(node, []).append((a, b))
-        out += [
-            TermUse(unit.unit_id, node, kind, len(spans), tuple(spans))  # type: ignore[arg-type]
-            for node, spans in by_node.items()
-        ]
+        for node, spans in by_node.items():
+            defined = kind == "defined"
+            nested = [i for i, (a, b) in enumerate(spans) if _inside(loose_spans, a, b)]
+            initial = [i for i, (a, _) in enumerate(spans) if _SENTENCE_START.search(unit.text[:a])]
+            out.append(
+                TermUse(
+                    unit.unit_id,
+                    node,
+                    kind,  # type: ignore[arg-type]
+                    len(spans),
+                    tuple(spans),
+                    tuple(nested) if defined else (),
+                    tuple(initial) if defined else (),
+                )
+            )
     return out
 
 

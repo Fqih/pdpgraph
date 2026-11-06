@@ -36,6 +36,8 @@ class TermItem(BaseModel):
     node_id: str
     term: str
     spans: list[tuple[int, int]] = Field(min_length=1)
+    nested_in_informal: bool = False  # a defined span sits inside an informal match
+    ambiguous_case: bool = False  # a defined span opens a sentence
     context: str  # the sentences holding the spans, each span in [[...]]
     proposed_by: Literal["claude"] = "claude"
     verdict: Literal["correct", "wrong"] | None = None
@@ -65,6 +67,32 @@ def _context(text: str, spans: list[tuple[int, int]]) -> str:
     return " … ".join(parts)
 
 
+def _priority(term: str) -> bool:
+    return len(term.split()) == 1 or term == "Setiap Orang"
+
+
+def _forced(
+    pool: list[TermUse], term: dict[str, str], nested: int, ambiguous: int, rng: random.Random
+) -> list[int]:
+    """Indices of the nested links, then sentence-initial ones: up to 2 per priority term
+    (rarest term first), then random ones, until the quotas are met where available."""
+    nest = [i for i, u in enumerate(pool) if u.nested_in_informal]
+    chosen = rng.sample(nest, min(nested, len(nest)))
+    have = sum(pool[i].ambiguous_case for i in chosen)
+    amb = [i for i, u in enumerate(pool) if u.ambiguous_case and i not in chosen]
+    by_term: dict[str, list[int]] = {}
+    for i in amb:
+        if _priority(term[pool[i].node_id]):
+            by_term.setdefault(pool[i].node_id, []).append(i)
+    for node in sorted(by_term, key=lambda n: (len(by_term[n]), n)):
+        take = rng.sample(by_term[node], min(2, len(by_term[node]), max(0, ambiguous - have)))
+        chosen += take
+        have += len(take)
+    left = [i for i in amb if i not in chosen]
+    chosen += rng.sample(left, min(len(left), max(0, ambiguous - have)))
+    return chosen
+
+
 def build_term_sample(
     units: list[Unit],
     defs: list[Definition],
@@ -72,20 +100,25 @@ def build_term_sample(
     *,
     defined: int = 30,
     informal: int = 10,
+    nested_min: int = 3,
+    ambiguous_min: int = 5,
     seed: int = 20261105,
 ) -> list[TermItem]:
-    """`defined` USES_TERM links and `informal` matches, each stratified by term."""
+    """`defined` USES_TERM links and `informal` matches, each stratified by term. The defined
+    links include `nested_min` nested and `ambiguous_min` sentence-initial links where available,
+    the sentence-initial ones from single-word terms and "Setiap Orang" first (owner, M1.4)."""
     rng = random.Random(seed)  # noqa: S311 - reproducible sampling, not crypto
     by_id = {u.unit_id: u for u in units}
     term = {d.node_id: d.term for d in defs}
     order = tuple(term)
-    chosen: list[TermUse] = []
-    for kind, size in (("defined", defined), ("informal", informal)):
-        pool = [u for u in uses if u.kind == kind]
-        tags: list[tuple[str, ...]] = [(u.node_id,) for u in pool]
-        chosen += [
-            pool[i] for i in stratified(tags, order, size, 2 if kind == "defined" else 1, rng)
-        ]
+    pool = [u for u in uses if u.kind == "defined"]
+    forced = _forced(pool, term, nested_min, ambiguous_min, rng)[:defined]
+    rest = [i for i in range(len(pool)) if i not in forced]
+    tags: list[tuple[str, ...]] = [(pool[i].node_id,) for i in rest]
+    fill = stratified(tags, order, max(0, defined - len(forced)), 2, rng)
+    chosen = [pool[i] for i in sorted([*forced, *(rest[k] for k in fill)])]
+    loose = [u for u in uses if u.kind == "informal"]
+    chosen += [loose[i] for i in stratified([(u.node_id,) for u in loose], order, informal, 1, rng)]
     return [
         TermItem(
             schema_version=1,
@@ -96,6 +129,8 @@ def build_term_sample(
             node_id=u.node_id,
             term=term[u.node_id],
             spans=list(u.spans),
+            nested_in_informal=u.nested_in_informal,
+            ambiguous_case=u.ambiguous_case,
             context=_context(by_id[u.unit_id].text, list(u.spans)),
         )
         for n, u in enumerate(chosen, start=1)
@@ -103,14 +138,19 @@ def build_term_sample(
 
 
 def score_terms(items: list[TermItem], uses: list[TermUse]) -> dict[str, dict[str, int]]:
-    """Rows `defined`, `informal`, one `term:<term>` slice per term of defined links, `stale`."""
+    """Rows `defined`, `defined:without_nested`, `ambiguous_case`, one `term:<term>` slice per
+    term of defined links, `informal`, and `stale`."""
     current = {(u.unit_id, u.node_id, u.kind) for u in uses}
     rows: dict[str, dict[str, int]] = {}
     for item in items:
         if item.verdict is None:
             continue
         live = (item.unit_id, item.node_id, item.kind) in current
-        keys = [item.kind, f"term:{item.term}"] if item.kind == "defined" else [item.kind]
+        keys: list[str] = [item.kind]
+        if item.kind == "defined":
+            keys.append(f"term:{item.term}")
+            keys += [] if item.nested_in_informal else ["defined:without_nested"]
+            keys += ["ambiguous_case"] if item.ambiguous_case else []
         for key in keys if live else ["stale"]:
             row = rows.setdefault(key, {"items": 0, "correct": 0})
             row["items"] += 1

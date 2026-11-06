@@ -38,6 +38,26 @@ def test_sample_sizes_kinds_and_term_coverage(term_units: list[Unit]) -> None:
     assert all(i.proposed_by == "claude" and i.verdict is None for i in items)
 
 
+def test_sample_includes_nested_and_ambiguous_links(term_units: list[Unit]) -> None:
+    items = build_term_sample(
+        term_units,
+        extract_definitions(term_units),
+        _uses(term_units),
+        defined=4,
+        informal=1,
+        nested_min=3,
+        ambiguous_min=2,
+        seed=3,
+    )
+    defined = [i for i in items if i.kind == "defined"]
+    assert len(defined) == 4
+    nested = [(i.unit_id, i.term) for i in defined if i.nested_in_informal]
+    assert nested == [("s/p3", "Data Pribadi")]  # the only one; quota is "where available"
+    ambiguous = [i for i in defined if i.ambiguous_case]
+    assert len(ambiguous) >= 2
+    assert any(i.term == "Korporasi" for i in ambiguous)  # single-word terms first
+
+
 def test_sample_takes_all_when_fewer(term_units: list[Unit]) -> None:
     items = _build(term_units, defined=100, informal=100)
     uses = _uses(term_units)
@@ -84,6 +104,9 @@ def test_score_rows_and_stale_links(term_units: list[Unit]) -> None:
     done = [i for i in labeled if i.verdict]
     defined = [i for i in done if i.kind == "defined"]
     assert rows["defined"]["items"] == len(defined)
+    plain = [i for i in defined if not i.nested_in_informal]
+    assert rows["defined:without_nested"]["items"] == len(plain)
+    assert rows["ambiguous_case"]["items"] == sum(i.ambiguous_case for i in defined)
     assert rows["defined"]["correct"] == sum(i.verdict == "correct" for i in defined)
     assert sum(rows[f"term:{t}"]["items"] for t in {i.term for i in defined}) == len(defined)
     # a link the current linker no longer produces is stale, not scored

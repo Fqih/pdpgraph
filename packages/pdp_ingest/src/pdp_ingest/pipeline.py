@@ -128,7 +128,16 @@ def run_text_stages(
             out / "defs.jsonl", (asdict(d) | {"term_norm": d.term_norm} for d in definitions)
         )
         _write_jsonl(
-            out / "term_uses.jsonl", (asdict(u) | {"confidence": u.confidence} for u in uses)
+            out / "term_uses.jsonl",
+            (
+                asdict(u)
+                | {
+                    "confidence": u.confidence,
+                    "nested_in_informal": u.nested_in_informal,
+                    "ambiguous_case": u.ambiguous_case,
+                }
+                for u in uses
+            ),
         )
         (out / "terms.json").write_text(
             json.dumps(term_list(definitions), ensure_ascii=False, indent=1) + "\n",

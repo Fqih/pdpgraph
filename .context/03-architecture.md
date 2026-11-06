@@ -186,6 +186,12 @@ stateDiagram-v2
 4. Same citation + entailment verification as Q&A.
 5. Map-reduce: obligations are evaluated in parallel (bounded concurrency), then reduced into a report with summary counts.
 
+**Data categories that do not map (owner rule, M1.4):**
+- Input data categories are matched against confirmed `DataCategory` codes only (04 §3.1).
+- A category that matches no confirmed code yields status `UNKNOWN` for the obligations it would trigger, with the category listed in `facts_missing`.
+- It is never forced into the nearest code.
+- `LAINNYA` (Pasal 4(2) huruf g, "data lainnya sesuai dengan ketentuan peraturan perundang-undangan") is open-ended: it is not a catch-all, and matching it also gives `UNKNOWN` unless another instrument in the graph names the category.
+
 ### 5.4 MCP server
 
 - Thin adapter over `core` (no business logic). Transports: stdio (local agent clients) and streamable HTTP.

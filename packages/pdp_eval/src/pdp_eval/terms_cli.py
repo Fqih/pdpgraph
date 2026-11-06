@@ -47,7 +47,14 @@ def cmd_terms_sample(args: argparse.Namespace, s: "Session", _: Callable[[], dat
         return 1
     defs, uses = _current(s)
     items = build_term_sample(
-        s.law.units, defs, uses, defined=args.defined, informal=args.informal, seed=args.seed
+        s.law.units,
+        defs,
+        uses,
+        defined=args.defined,
+        informal=args.informal,
+        nested_min=args.nested_min,
+        ambiguous_min=args.ambiguous_min,
+        seed=args.seed,
     )
     dump_term_items(args.file, items)
     population = Counter(u.kind for u in uses)
@@ -56,6 +63,10 @@ def cmd_terms_sample(args: argparse.Namespace, s: "Session", _: Callable[[], dat
     for kind in ("defined", "informal"):
         terms = len({i.term for i in items if i.kind == kind})
         s.say(f"  {kind}: {sampled[kind]} of {population[kind]} links, {terms} terms")
+    for flag in ("nested_in_informal", "ambiguous_case"):
+        have = sum(getattr(u, flag) for u in uses)
+        took = sum(getattr(i, flag) for i in items)
+        s.say(f"  {flag}: {took} of {have} defined links")
     return 0
 
 
@@ -112,13 +123,22 @@ def cmd_terms_report(args: argparse.Namespace, s: "Session", _: Callable[[], dat
         "",
         "`defined` rows are `USES_TERM` edges: precision = correct / labeled. `informal` is the "
         "share of lowercase matches that do use the defined term (they are not edges). `term:` "
-        "rows slice the defined links. `stale` links are no longer produced by the linker and "
+        "rows slice the defined links; `defined:without_nested` leaves out links with a defined "
+        "occurrence inside an informal match; `ambiguous_case` holds links with a sentence-initial "
+        "occurrence. `stale` links are no longer produced by the linker and "
         "are not scored. Wilson 95% intervals.",
         "",
         "| Row | Items | Correct | Rate |",
         "|---|---|---|---|",
     ]
-    order = ["defined", *sorted(k for k in rows if k.startswith("term:")), "informal", "stale"]
+    order = [
+        "defined",
+        "defined:without_nested",
+        "ambiguous_case",
+        *sorted(k for k in rows if k.startswith("term:")),
+        "informal",
+        "stale",
+    ]
     for key in order:
         if key in rows:
             r = rows[key]
@@ -141,6 +161,8 @@ def add_parsers(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> N
     sample.add_argument("--file", type=Path, default=default)
     sample.add_argument("--defined", type=int, default=30)
     sample.add_argument("--informal", type=int, default=10)
+    sample.add_argument("--nested-min", type=int, default=3)
+    sample.add_argument("--ambiguous-min", type=int, default=5)
     sample.add_argument("--seed", type=int, default=20261105)
     sample.set_defaults(fn=cmd_terms_sample)
     label = sub.add_parser("terms-label")

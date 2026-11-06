@@ -72,7 +72,9 @@ def defs_markdown(
         "",
         f"Definitions: {len(defs)}. Defined uses (`USES_TERM` edges): {kinds['defined']} "
         f"unit-term links, {occurrences['defined']} occurrences. Informal uses (no edge): "
-        f"{kinds['informal']} links, {occurrences['informal']} occurrences.",
+        f"{kinds['informal']} links, {occurrences['informal']} occurrences. Defined links with an "
+        f"occurrence inside an informal match: {sum(u.nested_in_informal for u in uses)}; with a "
+        f"sentence-initial occurrence (`ambiguous_case`): {sum(u.ambiguous_case for u in uses)}.",
         "",
         "Definitions reviewed: "
         + _progress(reviews, DEFINITION_SECTION, [d.unit_id for d in defs])

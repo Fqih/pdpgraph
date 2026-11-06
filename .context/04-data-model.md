@@ -94,7 +94,7 @@ Rules:
 | `:Definition` | `node_id`, `term`, `term_norm`, `aliases[]`, `text` | From definitional articles |
 | `:Obligation` | `node_id`, `actor_role`, `action`, `object`, `condition`, `deadline`, `modality ∈ {WAJIB, DILARANG, DAPAT}`, `review_status ∈ {PENDING, APPROVED, REJECTED}` | Extracted; only `APPROVED` used online |
 | `:Actor` | `name ∈ {PENGENDALI, PROSESOR, SUBJEK_DATA, LEMBAGA, DPO, PIHAK_KETIGA, ...}` | Controlled vocabulary |
-| `:DataCategory` | `code`, `label`, `unit_id`, `parent_code`, `open`, `status ∈ {proposed, confirmed}` | Derived from Pasal 4 (§3.8): classes `SPESIFIK`, `UMUM`; members `KESEHATAN`, `BIOMETRIK`, `GENETIKA`, `CATATAN_KEJAHATAN`, `ANAK`, `KEUANGAN_PRIBADI`, `LAINNYA` (open) under `SPESIFIK`; `NAMA_LENGKAP`, `JENIS_KELAMIN`, `KEWARGANEGARAAN`, `AGAMA`, `STATUS_PERKAWINAN`, `DIKOMBINASIKAN_UNTUK_MENGIDENTIFIKASI_SESEORANG` under `UMUM`. All `proposed` until the owner confirms them |
+| `:DataCategory` | `code`, `label`, `unit_id`, `parent_code`, `open`, `status ∈ {proposed, confirmed}` | Derived from Pasal 4 (§3.8): classes `SPESIFIK`, `UMUM`; members `KESEHATAN`, `BIOMETRIK`, `GENETIKA`, `CATATAN_KEJAHATAN`, `ANAK`, `KEUANGAN_PRIBADI`, `LAINNYA` (open) under `SPESIFIK`; `NAMA_LENGKAP`, `JENIS_KELAMIN`, `KEWARGANEGARAAN`, `AGAMA`, `STATUS_PERKAWINAN`, `DIKOMBINASIKAN_UNTUK_MENGIDENTIFIKASI_SESEORANG` under `UMUM`. All `proposed` until the owner confirms them. `SPESIFIK` and `UMUM` are parent nodes; members link to them with `SUBCATEGORY_OF`. `LAINNYA` is open-ended (03 §5.3: unmappable categories give `UNKNOWN`) |
 | `:Sanction` | `node_id`, `type ∈ {ADMINISTRATIVE, CRIMINAL}`, `description` | |
 | `:Concept` | `code` (e.g., `LEGAL_BASIS`, `CONSENT`, `BREACH_NOTIFICATION`, `CROSS_BORDER_TRANSFER`, `DPO`, `DPIA`, `RETENTION`) | Topic tags for routing gap analysis |
 
@@ -114,6 +114,7 @@ Rules:
 | `IMPOSES` | `LegalUnit` → `Obligation` | |
 | `APPLIES_TO_ACTOR` | `Obligation` → `Actor` | |
 | `TRIGGERED_BY` | `Obligation` → `DataCategory` / `Concept` | `condition_text` |
+| `SUBCATEGORY_OF` | `DataCategory` (member) → `DataCategory` (`SPESIFIK` / `UMUM`) | |
 | `EXCEPTION_OF` | `LegalUnit` → `Obligation` / `LegalUnit` | |
 | `SANCTIONED_BY` | `Obligation` → `Sanction` | |
 | `ABOUT` | `LegalUnit` → `Concept` | `confidence`, `method ∈ {RULE, LLM, MANUAL}` |
@@ -180,7 +181,9 @@ Artifacts in `data/processed/<source_id>/`:
 - `defs.jsonl`, one row per definition: `node_id` (`<source>/def/<slug>`, §2.1), `unit_id`, `term`, `term_norm`, `aliases` (from "yang selanjutnya disebut/disingkat"), and `text` (the whole definition item).
 - `term_uses.jsonl`, one row per unit, definition and kind:
   - `kind`: `defined` (the term's own capitalization; becomes a `USES_TERM` edge) or `informal` (another capitalization; `confidence: low`, no edge);
-  - `count` and char `spans`.
+  - `count` and char `spans`;
+  - for defined links: `nested_spans` and `ambiguous_spans` hold the indices of the spans inside an informal match and of the spans opening a sentence. `nested_in_informal` and `ambiguous_case` are true when either list is non-empty.
+  - The flags never drop a link; the owner's labels decide (06 §2.10).
 - `terms.json`: the sorted terms and aliases. This is the protected-terms list for the index (M1.6).
 - `data_categories.jsonl`: the candidate `:DataCategory` rows (§3.1) with `explanation` (the Penjelasan text, or null for "Cukup jelas").
 
